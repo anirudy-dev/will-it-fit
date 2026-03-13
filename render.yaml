@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: will-it-fit
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ANTHROPIC_API_KEY
+        sync: false   # you'll paste this in the Render dashboard
