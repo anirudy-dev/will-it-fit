@@ -1,50 +1,47 @@
-import express from 'express'
-import { createServer } from 'http'
-import { fileURLToPath } from 'url'
-import path from 'path'
+import express from "express";
+import { createServer } from "http";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import Anthropic from "@anthropic-ai/sdk";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const app = express()
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const app = express();
+app.use(express.json({ limit: "1mb" }));
 
-app.use(express.json({ limit: '2mb' }))
+// Serve Vite build
+app.use(express.static(join(__dirname, "dist")));
 
-// ── Serve Vite build ────────────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, 'dist')))
-
-// ── Anthropic API proxy ─────────────────────────────────────────────────────
-// Keeps the API key server-side; the browser never sees it.
-app.post('/api/claude', async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+// Anthropic proxy endpoint
+app.post("/api/claude", async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on server' })
+    return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   }
+
+  const client = new Anthropic({ apiKey });
 
   try {
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'web-search-2025-03-05',
-      },
-      body: JSON.stringify(req.body),
-    })
-
-    const data = await upstream.json()
-    res.status(upstream.status).json(data)
+    const { model, max_tokens, system, tools, messages } = req.body;
+    const response = await client.messages.create({
+      model,
+      max_tokens,
+      system,
+      tools,
+      messages,
+    });
+    res.json(response);
   } catch (err) {
-    console.error('Proxy error:', err)
-    res.status(502).json({ error: 'Failed to reach Anthropic API', detail: err.message })
+    console.error("Anthropic error:", err.message);
+    res.status(500).json({ error: err.message });
   }
-})
+});
 
-// ── SPA fallback ────────────────────────────────────────────────────────────
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'))
-})
+// SPA fallback
+app.get("*", (_req, res) => {
+  res.sendFile(join(__dirname, "dist", "index.html"));
+});
 
-const PORT = process.env.PORT || 3001
-app.listen(PORT, () => {
-  console.log(`✅ Will It Fit? server running on port ${PORT}`)
-})
+const PORT = process.env.PORT || 3000;
+createServer(app).listen(PORT, () => {
+  console.log(`Will it Fit? server running on port ${PORT}`);
+});
