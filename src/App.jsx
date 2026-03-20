@@ -1,4 +1,789 @@
+import * as THREE from "three";
+const _r3dCache = new WeakMap(); // Three.js scene cache keyed by canvas element
 import { useState, useRef, useEffect, useCallback } from "react";
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 const range = (s, e) => Array.from({ length: e - s + 1 }, (_, i) => s + i);
+const BOX_COLORS = [
+  "#3B82F6","#EF4444","#10B981","#F59E0B","#8B5CF6",
+  "#EC4899","#06B6D4","#F97316","#84CC16","#6366F1",
+];
+
+/* ─── car database ────────────────────────────────────────────────────────── */
+const CARS = {
+  Acura:{ ILX:{y:[2013,2022],cargo:{l:88,w:120,h:36},type:"Sedan"},MDX:{y:[2007,2024],cargo:{l:108,w:118,h:83},type:"SUV"},RDX:{y:[2007,2024],cargo:{l:100,w:108,h:75},type:"SUV"},TLX:{y:[2021,2024],cargo:{l:95,w:130,h:38},type:"Sedan"} },
+  Audi:{ A3:{y:[2006,2024],cargo:{l:85,w:110,h:38},type:"Sedan"},A4:{y:[2001,2024],cargo:{l:95,w:120,h:38},type:"Sedan"},A6:{y:[1998,2024],cargo:{l:100,w:125,h:40},type:"Sedan"},Q3:{y:[2015,2024],cargo:{l:85,w:100,h:68},type:"SUV"},Q5:{y:[2009,2024],cargo:{l:95,w:108,h:75},type:"SUV"},Q7:{y:[2007,2024],cargo:{l:115,w:118,h:83},type:"SUV"},Q8:{y:[2019,2024],cargo:{l:110,w:118,h:83},type:"SUV"} },
+  BMW:{ "3 Series":{y:[1994,2024],cargo:{l:95,w:122,h:38},type:"Sedan"},"5 Series":{y:[1996,2024],cargo:{l:102,w:128,h:40},type:"Sedan"},X1:{y:[2013,2024],cargo:{l:85,w:100,h:70},type:"SUV"},X3:{y:[2004,2024],cargo:{l:95,w:108,h:75},type:"SUV"},X5:{y:[2000,2024],cargo:{l:112,w:118,h:83},type:"SUV"},X7:{y:[2019,2024],cargo:{l:120,w:122,h:88},type:"SUV"} },
+  Buick:{ Enclave:{y:[2008,2024],cargo:{l:115,w:120,h:85},type:"SUV"},Encore:{y:[2013,2024],cargo:{l:85,w:102,h:70},type:"SUV"},"Encore GX":{y:[2020,2024],cargo:{l:88,w:105,h:72},type:"SUV"},Envision:{y:[2016,2024],cargo:{l:95,w:108,h:75},type:"SUV"} },
+  Cadillac:{ CT4:{y:[2020,2024],cargo:{l:88,w:120,h:36},type:"Sedan"},CT5:{y:[2020,2024],cargo:{l:98,w:128,h:38},type:"Sedan"},Escalade:{y:[1999,2024],cargo:{l:130,w:130,h:90},type:"SUV"},XT4:{y:[2019,2024],cargo:{l:92,w:105,h:72},type:"SUV"},XT5:{y:[2017,2024],cargo:{l:100,w:112,h:78},type:"SUV"},XT6:{y:[2020,2024],cargo:{l:108,w:115,h:83},type:"SUV"} },
+  Chevrolet:{ Blazer:{y:[2019,2024],cargo:{l:98,w:108,h:75},type:"SUV"},"Bolt EV":{y:[2017,2024],cargo:{l:88,w:110,h:75},type:"Hatchback"},Colorado:{y:[2004,2024],cargo:{l:155,w:132,h:50},type:"Truck"},Equinox:{y:[2005,2024],cargo:{l:97,w:108,h:78},type:"SUV"},Malibu:{y:[2004,2024],cargo:{l:90,w:128,h:36},type:"Sedan"},"Silverado 1500":{y:[2000,2024],cargo:{l:198,w:163,h:56},type:"Truck"},Suburban:{y:[1992,2024],cargo:{l:190,w:130,h:90},type:"SUV"},Tahoe:{y:[1992,2024],cargo:{l:130,w:130,h:85},type:"SUV"},Trailblazer:{y:[2021,2024],cargo:{l:90,w:105,h:72},type:"SUV"},Traverse:{y:[2009,2024],cargo:{l:120,w:120,h:88},type:"SUV"},Trax:{y:[2013,2024],cargo:{l:85,w:102,h:70},type:"SUV"} },
+  Chrysler:{ "300":{y:[2005,2023],cargo:{l:100,w:130,h:38},type:"Sedan"},Pacifica:{y:[2017,2024],cargo:{l:150,w:140,h:100},type:"Minivan"},Voyager:{y:[2020,2023],cargo:{l:145,w:138,h:98},type:"Minivan"} },
+  Dodge:{ Challenger:{y:[2008,2024],cargo:{l:88,w:115,h:36},type:"Sedan"},Charger:{y:[2006,2024],cargo:{l:93,w:125,h:38},type:"Sedan"},Durango:{y:[2000,2024],cargo:{l:120,w:118,h:85},type:"SUV"},"Grand Caravan":{y:[1984,2020],cargo:{l:148,w:138,h:98},type:"Minivan"},Hornet:{y:[2023,2024],cargo:{l:95,w:108,h:75},type:"SUV"} },
+  Ford:{ Bronco:{y:[2021,2024],cargo:{l:95,w:108,h:75},type:"SUV"},"Bronco Sport":{y:[2021,2024],cargo:{l:98,w:108,h:72},type:"SUV"},Edge:{y:[2007,2024],cargo:{l:100,w:110,h:78},type:"SUV"},Escape:{y:[2001,2024],cargo:{l:95,w:105,h:78},type:"SUV"},Expedition:{y:[1997,2024],cargo:{l:130,w:125,h:90},type:"SUV"},Explorer:{y:[1991,2024],cargo:{l:115,w:115,h:85},type:"SUV"},"F-150":{y:[2000,2024],cargo:{l:168,w:145,h:56},type:"Truck"},Fusion:{y:[2006,2020],cargo:{l:88,w:128,h:35},type:"Sedan"},Maverick:{y:[2022,2024],cargo:{l:137,w:107,h:50},type:"Truck"},Mustang:{y:[1994,2024],cargo:{l:85,w:108,h:34},type:"Sedan"},"Mustang Mach-E":{y:[2021,2024],cargo:{l:100,w:108,h:80},type:"SUV"},Ranger:{y:[2019,2024],cargo:{l:155,w:130,h:50},type:"Truck"} },
+  GMC:{ Acadia:{y:[2007,2024],cargo:{l:115,w:120,h:85},type:"SUV"},Canyon:{y:[2004,2024],cargo:{l:155,w:132,h:50},type:"Truck"},"Sierra 1500":{y:[2000,2024],cargo:{l:198,w:163,h:56},type:"Truck"},Terrain:{y:[2010,2024],cargo:{l:95,w:108,h:75},type:"SUV"},Yukon:{y:[1992,2024],cargo:{l:130,w:125,h:88},type:"SUV"},"Yukon XL":{y:[1992,2024],cargo:{l:190,w:130,h:90},type:"SUV"} },
+  Honda:{ Accord:{y:[1998,2024],cargo:{l:103,w:133,h:36},type:"Sedan"},Civic:{y:[2001,2024],cargo:{l:84,w:120,h:36},type:"Sedan"},"CR-V":{y:[1997,2024],cargo:{l:100,w:107,h:83},type:"SUV"},Fit:{y:[2007,2020],cargo:{l:84,w:110,h:78},type:"Hatchback"},"HR-V":{y:[2016,2024],cargo:{l:88,w:103,h:72},type:"SUV"},Odyssey:{y:[1999,2024],cargo:{l:150,w:140,h:100},type:"Minivan"},Passport:{y:[2019,2024],cargo:{l:108,w:115,h:83},type:"SUV"},Pilot:{y:[2003,2024],cargo:{l:120,w:120,h:90},type:"SUV"},Ridgeline:{y:[2006,2024],cargo:{l:127,w:150,h:48},type:"Truck"} },
+  Hyundai:{ Elantra:{y:[2001,2024],cargo:{l:88,w:128,h:36},type:"Sedan"},"Ioniq 5":{y:[2022,2024],cargo:{l:100,w:108,h:80},type:"SUV"},"Ioniq 6":{y:[2023,2024],cargo:{l:95,w:125,h:38},type:"Sedan"},Kona:{y:[2018,2024],cargo:{l:85,w:102,h:68},type:"SUV"},Palisade:{y:[2020,2024],cargo:{l:120,w:120,h:88},type:"SUV"},"Santa Cruz":{y:[2022,2024],cargo:{l:122,w:107,h:42},type:"Truck"},"Santa Fe":{y:[2001,2024],cargo:{l:108,w:115,h:83},type:"SUV"},Sonata:{y:[2005,2024],cargo:{l:88,w:130,h:36},type:"Sedan"},Tucson:{y:[2005,2024],cargo:{l:95,w:108,h:75},type:"SUV"},Venue:{y:[2020,2024],cargo:{l:82,w:100,h:68},type:"SUV"} },
+  Infiniti:{ Q50:{y:[2014,2024],cargo:{l:98,w:125,h:38},type:"Sedan"},QX50:{y:[2014,2024],cargo:{l:100,w:108,h:75},type:"SUV"},QX60:{y:[2014,2024],cargo:{l:112,w:118,h:83},type:"SUV"},QX80:{y:[2014,2024],cargo:{l:125,w:125,h:90},type:"SUV"} },
+  Jeep:{ Cherokee:{y:[2014,2024],cargo:{l:95,w:108,h:75},type:"SUV"},Compass:{y:[2007,2024],cargo:{l:90,w:105,h:72},type:"SUV"},Gladiator:{y:[2020,2024],cargo:{l:152,w:127,h:50},type:"Truck"},"Grand Cherokee":{y:[1993,2024],cargo:{l:108,w:112,h:83},type:"SUV"},"Grand Cherokee L":{y:[2022,2024],cargo:{l:120,w:115,h:85},type:"SUV"},Renegade:{y:[2015,2024],cargo:{l:85,w:102,h:70},type:"SUV"},Wrangler:{y:[1997,2024],cargo:{l:85,w:100,h:68},type:"SUV"} },
+  Kia:{ Carnival:{y:[2022,2024],cargo:{l:150,w:140,h:100},type:"Minivan"},EV6:{y:[2022,2024],cargo:{l:100,w:108,h:75},type:"SUV"},Forte:{y:[2010,2024],cargo:{l:85,w:120,h:36},type:"Sedan"},K5:{y:[2021,2024],cargo:{l:88,w:128,h:36},type:"Sedan"},Seltos:{y:[2021,2024],cargo:{l:88,w:105,h:72},type:"SUV"},Sorento:{y:[2003,2024],cargo:{l:108,w:115,h:83},type:"SUV"},Soul:{y:[2010,2024],cargo:{l:90,w:110,h:80},type:"Hatchback"},Sportage:{y:[2005,2024],cargo:{l:95,w:108,h:75},type:"SUV"},Stinger:{y:[2018,2023],cargo:{l:100,w:118,h:78},type:"Sedan"},Telluride:{y:[2020,2024],cargo:{l:120,w:120,h:88},type:"SUV"} },
+  Lexus:{ ES:{y:[2007,2024],cargo:{l:98,w:128,h:38},type:"Sedan"},GX:{y:[2003,2024],cargo:{l:108,w:115,h:83},type:"SUV"},IS:{y:[2001,2024],cargo:{l:88,w:118,h:36},type:"Sedan"},LX:{y:[1998,2024],cargo:{l:125,w:125,h:88},type:"SUV"},NX:{y:[2015,2024],cargo:{l:92,w:108,h:72},type:"SUV"},RX:{y:[1999,2024],cargo:{l:100,w:112,h:75},type:"SUV"},UX:{y:[2019,2024],cargo:{l:85,w:105,h:68},type:"SUV"} },
+  Lincoln:{ Aviator:{y:[2020,2024],cargo:{l:115,w:120,h:83},type:"SUV"},Corsair:{y:[2020,2024],cargo:{l:95,w:108,h:75},type:"SUV"},Nautilus:{y:[2019,2024],cargo:{l:100,w:110,h:78},type:"SUV"},Navigator:{y:[1998,2024],cargo:{l:130,w:125,h:90},type:"SUV"} },
+  Mazda:{ "CX-30":{y:[2020,2024],cargo:{l:88,w:105,h:70},type:"SUV"},"CX-5":{y:[2013,2024],cargo:{l:95,w:108,h:75},type:"SUV"},"CX-50":{y:[2023,2024],cargo:{l:98,w:110,h:75},type:"SUV"},"CX-9":{y:[2016,2023],cargo:{l:112,w:118,h:83},type:"SUV"},Mazda3:{y:[2004,2024],cargo:{l:88,w:120,h:38},type:"Sedan"},"Mazda3 Hatchback":{y:[2004,2024],cargo:{l:90,w:108,h:72},type:"Hatchback"},Mazda6:{y:[2003,2021],cargo:{l:90,w:122,h:36},type:"Sedan"} },
+  "Mercedes-Benz":{ "C-Class":{y:[2001,2024],cargo:{l:98,w:120,h:38},type:"Sedan"},"E-Class":{y:[1994,2024],cargo:{l:105,w:128,h:40},type:"Sedan"},GLA:{y:[2015,2024],cargo:{l:85,w:100,h:68},type:"SUV"},GLC:{y:[2016,2024],cargo:{l:95,w:108,h:75},type:"SUV"},GLE:{y:[2016,2024],cargo:{l:112,w:118,h:83},type:"SUV"},GLB:{y:[2020,2024],cargo:{l:90,w:108,h:72},type:"SUV"},GLS:{y:[2017,2024],cargo:{l:120,w:122,h:88},type:"SUV"} },
+  Mitsubishi:{ "Eclipse Cross":{y:[2018,2024],cargo:{l:88,w:105,h:72},type:"SUV"},Outlander:{y:[2003,2024],cargo:{l:108,w:115,h:80},type:"SUV"},"Outlander Sport":{y:[2011,2024],cargo:{l:88,w:103,h:72},type:"SUV"} },
+  Nissan:{ Altima:{y:[2002,2024],cargo:{l:93,w:130,h:36},type:"Sedan"},Armada:{y:[2004,2024],cargo:{l:125,w:125,h:88},type:"SUV"},Frontier:{y:[2005,2024],cargo:{l:127,w:111,h:46},type:"Truck"},Kicks:{y:[2018,2024],cargo:{l:85,w:102,h:68},type:"SUV"},Murano:{y:[2003,2024],cargo:{l:108,w:108,h:80},type:"SUV"},Pathfinder:{y:[2005,2024],cargo:{l:115,w:118,h:85},type:"SUV"},Rogue:{y:[2008,2024],cargo:{l:105,w:111,h:83},type:"SUV"},Sentra:{y:[2000,2024],cargo:{l:85,w:120,h:36},type:"Sedan"},Titan:{y:[2004,2024],cargo:{l:198,w:163,h:56},type:"Truck"},Versa:{y:[2007,2024],cargo:{l:80,w:115,h:36},type:"Sedan"} },
+  RAM:{ "1500":{y:[2002,2024],cargo:{l:168,w:145,h:56},type:"Truck"},"2500":{y:[2003,2024],cargo:{l:183,w:157,h:56},type:"Truck"},"ProMaster City":{y:[2015,2024],cargo:{l:175,w:168,h:130},type:"Van"} },
+  Subaru:{ Ascent:{y:[2019,2024],cargo:{l:120,w:120,h:88},type:"SUV"},Crosstrek:{y:[2013,2024],cargo:{l:88,w:108,h:75},type:"SUV"},Forester:{y:[1998,2024],cargo:{l:107,w:105,h:83},type:"SUV"},Impreza:{y:[2002,2024],cargo:{l:90,w:108,h:75},type:"Hatchback"},Legacy:{y:[1995,2024],cargo:{l:90,w:128,h:36},type:"Sedan"},Outback:{y:[1995,2024],cargo:{l:108,w:115,h:83},type:"SUV"} },
+  Tesla:{ "Model 3":{y:[2017,2024],cargo:{l:95,w:120,h:38},type:"Sedan"},"Model S":{y:[2012,2024],cargo:{l:95,w:128,h:38},type:"Sedan"},"Model X":{y:[2015,2024],cargo:{l:120,w:120,h:90},type:"SUV"},"Model Y":{y:[2020,2024],cargo:{l:105,w:115,h:83},type:"SUV"},Cybertruck:{y:[2024,2024],cargo:{l:163,w:122,h:56},type:"Truck"} },
+  Toyota:{ "4Runner":{y:[1996,2024],cargo:{l:110,w:115,h:83},type:"SUV"},bZ4X:{y:[2023,2024],cargo:{l:95,w:108,h:75},type:"SUV"},Camry:{y:[1997,2024],cargo:{l:95,w:148,h:38},type:"Sedan"},Corolla:{y:[1993,2024],cargo:{l:84,w:120,h:36},type:"Sedan"},"Corolla Cross":{y:[2022,2024],cargo:{l:88,w:105,h:72},type:"SUV"},Crown:{y:[2023,2024],cargo:{l:98,w:128,h:38},type:"Sedan"},Highlander:{y:[2001,2024],cargo:{l:115,w:125,h:85},type:"SUV"},"Land Cruiser":{y:[1998,2024],cargo:{l:120,w:120,h:88},type:"SUV"},RAV4:{y:[1996,2024],cargo:{l:105,w:111,h:83},type:"SUV"},Sequoia:{y:[2001,2024],cargo:{l:130,w:130,h:88},type:"SUV"},Sienna:{y:[1998,2024],cargo:{l:150,w:142,h:100},type:"Minivan"},Tacoma:{y:[1995,2024],cargo:{l:127,w:111,h:46},type:"Truck"},Tundra:{y:[2000,2024],cargo:{l:168,w:145,h:56},type:"Truck"},Venza:{y:[2021,2024],cargo:{l:95,w:112,h:75},type:"SUV"} },
+  Volkswagen:{ Atlas:{y:[2018,2024],cargo:{l:120,w:120,h:88},type:"SUV"},"Atlas Cross Sport":{y:[2020,2024],cargo:{l:108,w:120,h:80},type:"SUV"},Golf:{y:[2000,2024],cargo:{l:95,w:108,h:75},type:"Hatchback"},"ID.4":{y:[2021,2024],cargo:{l:100,w:108,h:75},type:"SUV"},Jetta:{y:[2000,2024],cargo:{l:85,w:108,h:36},type:"Sedan"},Taos:{y:[2022,2024],cargo:{l:88,w:105,h:72},type:"SUV"},Tiguan:{y:[2009,2024],cargo:{l:95,w:108,h:75},type:"SUV"} },
+  Volvo:{ S60:{y:[2011,2024],cargo:{l:90,w:120,h:38},type:"Sedan"},V60:{y:[2015,2024],cargo:{l:100,w:112,h:72},type:"Wagon"},XC40:{y:[2019,2024],cargo:{l:88,w:105,h:72},type:"SUV"},XC60:{y:[2010,2024],cargo:{l:100,w:112,h:75},type:"SUV"},XC90:{y:[2016,2024],cargo:{l:115,w:120,h:83},type:"SUV"} },
+};
+Object.values(CARS).forEach(ms => Object.values(ms).forEach(m => { m.years = range(m.y[0], m.y[1]); }));
+
+/* ─── packing ─────────────────────────────────────────────────────────────── */
+function packBoxes(inputBoxes, cargo) {
+  const placed = [];
+  const sorted = [...inputBoxes].sort((a,b) => b.l*b.w*b.h - a.l*a.w*a.h);
+  for (const box of sorted) {
+    const rots = [[box.l,box.w,box.h],[box.l,box.h,box.w],[box.w,box.l,box.h],[box.w,box.h,box.l],[box.h,box.l,box.w],[box.h,box.w,box.l]];
+    let ok = false;
+    const eps = [{x:0,y:0,z:0}];
+    for (const p of placed) eps.push({x:p.x+p.rl,y:p.y,z:p.z},{x:p.x,y:p.y+p.rw,z:p.z},{x:p.x,y:p.y,z:p.z+p.rh});
+    eps.sort((a,b) => a.z-b.z||a.y-b.y||a.x-b.x);
+    outer: for (const ep of eps) {
+      for (const [rl,rw,rh] of rots) {
+        let z = ep.z;
+        for (const p of placed) if (ep.x<p.x+p.rl&&ep.x+rl>p.x&&ep.y<p.y+p.rw&&ep.y+rw>p.y) z=Math.max(z,p.z+p.rh);
+        if (ep.x+rl>cargo.l||ep.y+rw>cargo.w||z+rh>cargo.h) continue;
+        if (placed.some(p=>ep.x<p.x+p.rl&&ep.x+rl>p.x&&ep.y<p.y+p.rw&&ep.y+rw>p.y&&z<p.z+p.rh&&z+rh>p.z)) continue;
+        placed.push({...box,x:ep.x,y:ep.y,z,rl,rw,rh}); ok=true; break outer;
+      }
+    }
+    if (!ok) return {fits:false,arrangement:placed,failedBox:box};
+  }
+  return {fits:true,arrangement:placed};
+}
+
+/* ─── canvas renderer ─────────────────────────────────────────────────────── */
+function renderView(canvas, cargo, arr, view, hlId) {
+  if (!canvas||!cargo) return;
+  const ctx=canvas.getContext("2d"), W=canvas.width, H=canvas.height;
+  const [dX,dY]=view==="top"?[cargo.l,cargo.w]:[cargo.w,cargo.h];
+  const pad=48, sc=Math.min((W-2*pad)/dX,(H-2*pad)/dY);
+  const ox=Math.floor((W-dX*sc)/2), oy=Math.floor((H-dY*sc)/2);
+  ctx.clearRect(0,0,W,H); ctx.fillStyle="#F9FAFB"; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle="rgba(0,0,0,0.04)"; ctx.lineWidth=1;
+  for(let x=0;x<=dX;x+=10){ctx.beginPath();ctx.moveTo(ox+x*sc,oy);ctx.lineTo(ox+x*sc,oy+dY*sc);ctx.stroke();}
+  for(let y=0;y<=dY;y+=10){ctx.beginPath();ctx.moveTo(ox,oy+y*sc);ctx.lineTo(ox+dX*sc,oy+y*sc);ctx.stroke();}
+  ctx.fillStyle="rgba(59,130,246,0.04)"; ctx.fillRect(ox,oy,dX*sc,dY*sc);
+  ctx.strokeStyle="#3B82F6"; ctx.lineWidth=2; ctx.setLineDash([8,4]);
+  ctx.strokeRect(ox,oy,dX*sc,dY*sc); ctx.setLineDash([]);
+  ctx.fillStyle="#6B7280"; ctx.font="bold 12px system-ui,sans-serif"; ctx.textAlign="center";
+  ctx.fillText(`${dX} cm`,ox+dX*sc/2,oy-14);
+  ctx.save(); ctx.translate(ox-18,oy+dY*sc/2); ctx.rotate(-Math.PI/2); ctx.fillText(`${dY} cm`,0,0); ctx.restore();
+  const lbl=view==="top"?"TOP VIEW":"SIDE VIEW";
+  ctx.font="bold 11px system-ui,sans-serif"; ctx.textAlign="left";
+  const tw=ctx.measureText(lbl).width;
+  ctx.fillStyle="rgba(59,130,246,0.1)"; ctx.fillRect(8,H-28,tw+16,20);
+  ctx.fillStyle="#3B82F6"; ctx.fillText(lbl,16,H-13);
+  for (const b of arr) {
+    let bx,by,bw,bh;
+    if(view==="top"){bx=ox+b.x*sc;by=oy+b.y*sc;bw=b.rl*sc;bh=b.rw*sc;}
+    else{bx=ox+b.y*sc;by=oy+(dY-b.z-b.rh)*sc;bw=b.rw*sc;bh=b.rh*sc;}
+    const hl=b.id===hlId;
+    ctx.fillStyle="rgba(0,0,0,0.08)"; ctx.fillRect(bx+2,by+2,bw,bh);
+    ctx.fillStyle=b.color+(hl?"33":"22"); ctx.fillRect(bx,by,bw,bh);
+    const g=ctx.createLinearGradient(bx,by,bx,by+bh);
+    g.addColorStop(0,"rgba(255,255,255,0.5)"); g.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle=g; ctx.fillRect(bx,by,bw,bh/2);
+    ctx.strokeStyle=b.color; ctx.lineWidth=hl?2.5:1.5; ctx.strokeRect(bx,by,bw,bh);
+    if(bw>30&&bh>20){
+      const fs=Math.max(10,Math.min(13,Math.min(bw,bh)/5));
+      ctx.fillStyle=b.color; ctx.font=`bold ${fs}px system-ui,sans-serif`; ctx.textAlign="center";
+      const name=(b.productName||"").substring(0,Math.floor(bw/(fs*0.55)));
+      ctx.fillText(name,bx+bw/2,by+bh/2+(view==="top"&&bh>34?-5:fs/3));
+      if(bh>34&&view==="top"){
+        ctx.font=`${fs-2}px system-ui,sans-serif`; ctx.fillStyle=b.color+"99";
+        ctx.fillText(`${b.rl}×${b.rw}×${b.rh}cm`,bx+bw/2,by+bh/2+fs*1.1);
+      }
+    }
+  }
+}
+
+/* ─── car boot 3d renderer ──────────────────────────────────────────────── */
+// Photorealistic interior view — looking straight into the open boot.
+// Coordinate system: cx = depth (0 = opening, cargo.l = back wall)
+//                    cy = width  (0 = left wall, cargo.w = right wall)
+//                    cz = height (0 = floor, cargo.h = ceiling)
+/* ─── car boot 3d renderer — Three.js WebGL ─────────────────────────────── */
+// Builds a photorealistic 3D interior scene: PBR materials, real shadows,
+// ACES tone-mapping, strong directional daylight from the open boot.
+// Scene is cached on the canvas element and rebuilt only when cargo/carType changes.
+
+function render3D(canvas, cargo, arr, hlId, carType = "SUV") {
+  if (!canvas || !cargo || typeof THREE === "undefined") return;
+
+  const cacheKey = `${cargo.l}|${cargo.w}|${cargo.h}|${carType}`;
+  let st = _r3dCache.get(canvas);
+
+  if (!st || st.key !== cacheKey) {
+    // Dispose old scene if it exists
+    if (st) {
+      st.renderer.dispose();
+      st.scene.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach(m => m.dispose());
+        }
+      });
+    }
+    st = _buildScene(canvas, cargo, carType);
+    st.key = cacheKey;
+    _r3dCache.set(canvas, st);
+  }
+
+  _updateBoxes(st.boxGroup, arr, hlId);
+  st.renderer.render(st.scene, st.camera);
+}
+
+function _buildScene(canvas, cargo, carType) {
+  const { l, w, h } = cargo; // trunk dimensions in cm
+  const W = canvas.width, H = canvas.height;
+
+  // ── Renderer ──────────────────────────────────────────────────────────────
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setSize(W, H, false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  // outputEncoding for r128 compatibility
+  if (typeof THREE.sRGBEncoding !== "undefined") {
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  }
+
+  // ── Scene ─────────────────────────────────────────────────────────────────
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x14161B);
+
+  // ── Camera ────────────────────────────────────────────────────────────────
+  // Positioned just outside the boot opening, slightly above the sill,
+  // looking inward and slightly downward — matches the reference image angle.
+  const camera = new THREE.PerspectiveCamera(62, W / H, 1, l * 10);
+  camera.position.set(-w * 0.38, h * 0.38, w / 2);
+  camera.lookAt(l * 0.42, h * 0.12, w / 2);
+  scene.add(camera);
+
+  // ── Lighting ──────────────────────────────────────────────────────────────
+  // 1. Hemisphere — warm sky / cool ground bounce
+  const hemi = new THREE.HemisphereLight(0xDDEEFF, 0x604828, 0.45);
+  scene.add(hemi);
+
+  // 2. Sun — strong warm directional light from outside (through the opening)
+  //    This is the dominant light; it creates realistic shadows inside the trunk.
+  const sun = new THREE.DirectionalLight(0xFFF4E0, 3.8);
+  sun.position.set(-w * 0.7, h * 1.4, w * 0.5);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far  = l * 8;
+  sun.shadow.camera.left   = -w * 0.8;
+  sun.shadow.camera.right  =  w * 1.8;
+  sun.shadow.camera.top    =  h * 2;
+  sun.shadow.camera.bottom = -h * 0.5;
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.04;
+  scene.add(sun);
+
+  // 3. Dome / overhead fill — simulates the headliner dome light
+  const dome = new THREE.PointLight(0xFFFFEE, 0.8, l * 2.8, 1.4);
+  dome.position.set(l * 0.28, h * 0.96, w * 0.5);
+  scene.add(dome);
+
+  // 4. Rear fill — prevents the back of the trunk going pitch black
+  const fill = new THREE.DirectionalLight(0x7090CC, 0.55);
+  fill.position.set(l * 1.2, h * 0.6, w * 0.5);
+  scene.add(fill);
+
+  // ── Material palette ──────────────────────────────────────────────────────
+  // Carpet: warm cream/beige — the key visual element from the reference image
+  const matCarpet = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0xC0B8AC),
+    roughness: 0.88,
+    metalness: 0.0,
+  });
+
+  // Plastic trim panels (walls, ceiling)
+  const matTrim = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0x272A32),
+    roughness: 0.84,
+    metalness: 0.04,
+  });
+
+  // Headliner (darker than trim)
+  const matHeadliner = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0x222530),
+    roughness: 0.92,
+    metalness: 0.0,
+  });
+
+  // Back wall / seat back fabric
+  const matSeat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0x30343C),
+    roughness: 0.87,
+    metalness: 0.0,
+  });
+
+  // Chrome sill — high metalness, very low roughness
+  const matChrome = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0xD8DCE8),
+    roughness: 0.06,
+    metalness: 0.96,
+  });
+
+  // ── Interior panels ───────────────────────────────────────────────────────
+  // Coordinate system: X=depth(0=opening,l=back), Y=height(0=floor,h=ceiling), Z=width(0=left,w=right)
+  const T = 1.5; // panel thickness in cm
+
+  const addBox = (geo, mat, px, py, pz) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(px, py, pz);
+    m.receiveShadow = true;
+    m.castShadow   = false;
+    scene.add(m); return m;
+  };
+
+  // Floor (carpet)
+  addBox(new THREE.BoxGeometry(l + T*2, T, w + T*2), matCarpet, l/2, -T/2, w/2);
+
+  // Ceiling (headliner)
+  addBox(new THREE.BoxGeometry(l, T, w), matHeadliner, l/2, h + T/2, w/2);
+
+  // Left wall (Z = 0)
+  addBox(new THREE.BoxGeometry(l, h + T, T), matTrim, l/2, h/2, -T/2);
+
+  // Right wall (Z = w)
+  addBox(new THREE.BoxGeometry(l, h + T, T), matTrim, l/2, h/2, w + T/2);
+
+  // Back wall (X = l) — slightly darker panel
+  addBox(new THREE.BoxGeometry(T, h, w), matSeat, l + T/2, h/2, w/2);
+
+  // Chrome boot sill across the opening bottom
+  addBox(new THREE.BoxGeometry(T * 4, 5, w + 10), matChrome, -T, 2.5, w/2);
+
+  // ── Horizontal trim ribs on side walls ────────────────────────────────────
+  const ribMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0x1E2028), roughness: 0.80, metalness: 0.06,
+  });
+  const ribH = [0.28, 0.54, 0.74];
+  ribH.forEach(frac => {
+    // Left wall rib
+    const rg = new THREE.BoxGeometry(l * 0.88, T * 2.5, T * 2.5);
+    addBox(rg, ribMat, l * 0.46, h * frac, 0);
+    // Right wall rib
+    const rg2 = new THREE.BoxGeometry(l * 0.88, T * 2.5, T * 2.5);
+    addBox(rg2, ribMat, l * 0.46, h * frac, w);
+  });
+
+  // ── Seat backs at the back wall ───────────────────────────────────────────
+  if (carType !== "Truck") {
+    const nSeats   = (carType === "Minivan" || carType === "Van") ? 3 : 2;
+    const seatTopY = h * (carType === "Sedan" ? 0.68 : 0.74);
+    for (let si = 0; si < nSeats; si++) {
+      const z0 = (si + 0.06) / nSeats * w;
+      const z1 = (si + 0.94) / nSeats * w;
+      const sw2 = z1 - z0;
+      const sg = new THREE.BoxGeometry(T * 5, seatTopY, sw2 * 0.92);
+      const seat = new THREE.Mesh(sg, matSeat);
+      seat.position.set(l - T * 1.5, seatTopY / 2, z0 + sw2 / 2);
+      seat.receiveShadow = true;
+      scene.add(seat);
+      // Seat top (headrest area)
+      if (carType !== "Sedan") {
+        const hg = new THREE.BoxGeometry(T * 3, h * 0.10, sw2 * 0.55);
+        addBox(hg, matSeat, l - T * 1.2, seatTopY + h * 0.05, z0 + sw2 / 2);
+      }
+    }
+  }
+
+  // ── Tie-down hooks (chrome detail on floor) ───────────────────────────────
+  [[l*0.25, w*0.05], [l*0.25, w*0.95], [l*0.72, w*0.05], [l*0.72, w*0.95]].forEach(([hx,hz]) => {
+    addBox(new THREE.BoxGeometry(6, 2, 6), matChrome, hx, 1.5, hz);
+  });
+
+  // ── Box group (populated per frame) ───────────────────────────────────────
+  const boxGroup = new THREE.Group();
+  scene.add(boxGroup);
+
+  return { renderer, scene, camera, boxGroup };
+}
+
+function _updateBoxes(boxGroup, arr, hlId) {
+  // Dispose old meshes
+  while (boxGroup.children.length > 0) {
+    const ch = boxGroup.children[0];
+    if (ch.geometry) ch.geometry.dispose();
+    if (ch.material) {
+      const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+      mats.forEach(m => m.dispose());
+    }
+    boxGroup.remove(ch);
+  }
+
+  arr.forEach(b => {
+    const { x, y, z, rl, rw, rh, color, id } = b;
+    const hl   = id === hlId;
+    const col  = new THREE.Color(color);
+
+    // Box mesh — cargo space: x=depth, y=width, z=height → Three: X=depth, Y=height, Z=width
+    const geo = new THREE.BoxGeometry(rl, rh, rw);
+    const mat = new THREE.MeshStandardMaterial({
+      color:     col,
+      roughness: hl ? 0.32 : 0.52,
+      metalness: 0.02,
+      emissive:  hl ? col.clone().multiplyScalar(0.18) : new THREE.Color(0x000000),
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x + rl/2, z + rh/2, y + rw/2);
+    mesh.castShadow    = true;
+    mesh.receiveShadow = true;
+    boxGroup.add(mesh);
+
+    // White edge wireframe for selected box
+    if (hl) {
+      const edges   = new THREE.EdgesGeometry(geo);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xFFFFFF });
+      const lines   = new THREE.LineSegments(edges, lineMat);
+      lines.position.copy(mesh.position);
+      boxGroup.add(lines);
+    }
+
+    // Label sprite
+    const labelTex = _makeLabel(b.productName || "", color, `${rl}×${rw}×${rh}`);
+    const spriteMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true, depthTest: false });
+    const sprite    = new THREE.Sprite(spriteMat);
+    sprite.position.set(x + rl/2, z + rh + 4, y + rw/2);
+    // Scale sprite so it's roughly the width of the box, a reasonable height
+    const spriteW = Math.max(20, Math.min(rl, 60));
+    sprite.scale.set(spriteW, spriteW * 0.28, 1);
+    boxGroup.add(sprite);
+  });
+}
+
+function _makeLabel(name, color, dims) {
+  const W = 512, H = 128;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+
+  // Pill background
+  ctx.fillStyle = "rgba(10,12,18,0.78)";
+  ctx.beginPath(); ctx.roundRect(6, 6, W-12, H-12, 16); ctx.fill();
+
+  // Color accent strip
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.roundRect(6, 6, 10, H-12, [16,0,0,16]); ctx.fill();
+
+  // Name
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 44px system-ui,sans-serif";
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillText(name.substring(0, 14), 30, H * 0.4);
+
+  // Dimensions
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.font = "32px system-ui,sans-serif";
+  ctx.fillText(dims + " cm", 30, H * 0.75);
+
+  return new THREE.CanvasTexture(c);
+}
+
+/* ─── confetti ────────────────────────────────────────────────────────────── */
+function Confetti({ active }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!active) return;
+    const c = ref.current; if (!c) return;
+    c.width=window.innerWidth; c.height=window.innerHeight;
+    const ctx=c.getContext("2d");
+    const COLS=["#3B82F6","#EF4444","#10B981","#F59E0B","#8B5CF6","#EC4899","#06B6D4","#F97316"];
+    const pts=Array.from({length:160},()=>({x:Math.random()*c.width,y:Math.random()*c.height-c.height,vx:(Math.random()-0.5)*2,vy:Math.random()*4+2,rot:Math.random()*Math.PI*2,rs:(Math.random()-0.5)*0.15,w:Math.random()*12+5,h:Math.random()*6+3,r:Math.random()*5+3,shape:Math.random()>0.4?"rect":"circle",color:COLS[Math.floor(Math.random()*COLS.length)]}));
+    let raf,frame=0;
+    const draw=()=>{frame++;ctx.clearRect(0,0,c.width,c.height);for(const p of pts){p.y+=p.vy;p.x+=p.vx+Math.sin(frame*0.03+p.r)*0.5;p.rot+=p.rs;const alpha=Math.max(0,1-p.y/c.height*0.9);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=alpha;ctx.fillStyle=p.color;if(p.shape==="rect")ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);else{ctx.beginPath();ctx.arc(0,0,p.r,0,Math.PI*2);ctx.fill();}ctx.restore();if(p.y>c.height+10){p.y=-10;p.x=Math.random()*c.width;}}raf=requestAnimationFrame(draw);};
+    raf=requestAnimationFrame(draw);const t=setTimeout(()=>{cancelAnimationFrame(raf);ctx.clearRect(0,0,c.width,c.height);},5000);return()=>{cancelAnimationFrame(raf);clearTimeout(t);};
+  },[active]);
+  if(!active) return null;
+  return <canvas ref={ref} style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9999,width:"100vw",height:"100vh"}}/>;
+}
+
+/* ─── ui atoms ────────────────────────────────────────────────────────────── */
+const Label = ({children}) => (
+  <div style={{fontSize:11,fontWeight:600,letterSpacing:"0.08em",color:"#6B7280",textTransform:"uppercase",marginBottom:6}}>{children}</div>
+);
+const Input = (props) => (
+  <input {...props} style={{width:"100%",boxSizing:"border-box",border:"1.5px solid #E5E7EB",borderRadius:8,padding:"10px 14px",fontSize:14,color:"#111827",background:"#fff",outline:"none",fontFamily:"inherit",...(props.style||{})}}/>
+);
+const SelectInput = ({children,...props}) => (
+  <select {...props} style={{width:"100%",boxSizing:"border-box",border:"1.5px solid #E5E7EB",borderRadius:8,padding:"10px 14px",fontSize:14,color:"#111827",background:"#fff",outline:"none",fontFamily:"inherit",cursor:"pointer",appearance:"none",backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 12px center",paddingRight:36}}>{children}</select>
+);
+const StepBadge = ({n}) => (
+  <div style={{width:28,height:28,borderRadius:"50%",background:"#1E3A5F",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{n}</div>
+);
+const Card = ({children,style={}}) => (
+  <div style={{background:"#fff",border:"1.5px solid #E5E7EB",borderRadius:12,padding:"20px",boxShadow:"0 1px 3px rgba(0,0,0,0.04)",...style}}>{children}</div>
+);
+
+/* ─── empty form state ───────────────────────────────────────────────────── */
+const emptyForm = () => ({ name:"", packages:[{l:"",w:"",h:""}] });
+
+/* ─── main app ────────────────────────────────────────────────────────────── */
+export default function App() {
+  const [products,setProducts]         = useState([]);
+  const [form,setForm]                 = useState(emptyForm());
+  const [formError,setFormError]       = useState("");
+  const [make,setMake]                 = useState("");
+  const [model,setModel]               = useState("");
+  const [year,setYear]                 = useState("");
+  const [result,setResult]             = useState(null);
+  const [hlId,setHlId]                 = useState(null);
+  const [dragging,setDragging]         = useState(null);
+  const [activeView,setActiveView]     = useState("both");
+  const [showConfetti,setShowConfetti] = useState(false);
+
+  const topRef=useRef(null),sideRef=useRef(null),threeRef=useRef(null),arrRef=useRef([]),dragRef=useRef(null);
+
+  const makes  = Object.keys(CARS).sort();
+  const models = make ? Object.keys(CARS[make]).sort() : [];
+  const years  = make&&model ? [...CARS[make][model].years].sort((a,b)=>b-a) : [];
+  const cargo  = make&&model ? CARS[make][model].cargo : null;
+  const carType= make&&model ? CARS[make][model].type  : "";
+
+  const updatePkg = (i,field,val) => setForm(f=>({...f,packages:f.packages.map((p,idx)=>idx===i?{...p,[field]:val}:p)}));
+  const addPackage = () => setForm(f=>({...f,packages:[...f.packages,{l:"",w:"",h:""}]}));
+  const removePkg  = i => setForm(f=>({...f,packages:f.packages.filter((_,idx)=>idx!==i)}));
+
+  const addProduct = () => {
+    setFormError("");
+    if (!form.name.trim()) { setFormError("Please enter a product name."); return; }
+    for (let i=0;i<form.packages.length;i++) {
+      const{l,w,h}=form.packages[i];
+      if(!l||!w||!h||isNaN(+l)||isNaN(+w)||isNaN(+h)||+l<=0||+w<=0||+h<=0){setFormError(`Package ${i+1}: all dimensions must be positive numbers.`);return;}
+    }
+    const color=BOX_COLORS[products.length%BOX_COLORS.length];
+    setProducts(prev=>[...prev,{id:Date.now(),name:form.name.trim(),boxes:form.packages.map(p=>({l:+p.l,w:+p.w,h:+p.h})),color}]);
+    setForm(emptyForm()); setResult(null);
+  };
+
+  const removeProduct = id=>{setProducts(p=>p.filter(x=>x.id!==id));setResult(null);};
+
+  const checkFit = () => {
+    if(!cargo) return;
+    const ready=products.filter(p=>p.boxes?.length);
+    if(!ready.length) return;
+    const boxes=ready.flatMap(p=>p.boxes.map((b,i)=>({...b,id:`${p.id}-${i}`,productId:p.id,productName:p.name,color:p.color})));
+    const res=packBoxes(boxes,cargo);
+    arrRef.current=res.arrangement; setResult(res);
+    if(res.fits){setShowConfetti(false);setTimeout(()=>setShowConfetti(true),30);}
+    else setShowConfetti(false);
+  };
+
+  const redraw=useCallback((hl=hlId)=>{
+    if(!result||!cargo) return;
+    renderView(topRef.current,cargo,arrRef.current,"top",hl);
+    renderView(sideRef.current,cargo,arrRef.current,"side",hl);
+    render3D(threeRef.current,cargo,arrRef.current,hl,carType);
+  },[result,cargo,hlId]);
+  useEffect(()=>{redraw();},[redraw]);
+
+  const getXY=(e,canvas)=>{
+    const r=canvas.getBoundingClientRect(),sw=canvas.width/r.width,sh=canvas.height/r.height;
+    const mx=(e.clientX-r.left)*sw,my=(e.clientY-r.top)*sh;
+    const pad=48,sc=Math.min((canvas.width-2*pad)/cargo.l,(canvas.height-2*pad)/cargo.w);
+    const ox=(canvas.width-cargo.l*sc)/2,oy=(canvas.height-cargo.w*sc)/2;
+    return{cx:(mx-ox)/sc,cy:(my-oy)/sc};
+  };
+  const onMD=useCallback(e=>{
+    if(!result||!cargo) return;
+    const{cx,cy}=getXY(e,topRef.current);
+    for(let i=arrRef.current.length-1;i>=0;i--){const b=arrRef.current[i];if(cx>=b.x&&cx<=b.x+b.rl&&cy>=b.y&&cy<=b.y+b.rw){dragRef.current={idx:i,offX:cx-b.x,offY:cy-b.y};setDragging(i);setHlId(b.id);break;}}
+  },[result,cargo]);
+  const onMM=useCallback(e=>{
+    if(!dragRef.current||!cargo) return;
+    const{cx,cy}=getXY(e,topRef.current),{idx,offX,offY}=dragRef.current,b=arrRef.current[idx];
+    arrRef.current=arrRef.current.map((box,i)=>i===idx?{...box,x:Math.max(0,Math.min(cargo.l-b.rl,cx-offX)),y:Math.max(0,Math.min(cargo.w-b.rw,cy-offY))}:box);
+    redraw(b.id);
+  },[cargo,redraw]);
+  const onMU=useCallback(()=>{dragRef.current=null;setDragging(null);},[]);
+  const onTS=useCallback(e=>{e.preventDefault();onMD({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY});},[onMD]);
+  const onTM=useCallback(e=>{e.preventDefault();onMM({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY});},[onMM]);
+
+  const canCheck=cargo&&products.length>0;
+  const canAdd=form.name.trim()&&form.packages.every(p=>p.l&&p.w&&p.h);
+
+  return (
+    <div style={{fontFamily:"system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:"#F3F4F6",minHeight:"100vh",color:"#111827"}}>
+      <Confetti active={showConfetti}/>
+
+      <nav style={{background:"#fff",borderBottom:"1px solid #E5E7EB",padding:"0 24px",display:"flex",alignItems:"center",height:56,gap:12}}>
+        <div style={{width:32,height:32,borderRadius:8,background:"#1E3A5F",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          </svg>
+        </div>
+        <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
+        <span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Boot Space Checker</span>
+      </nav>
+
+      <div style={{maxWidth:1280,margin:"0 auto",padding:"40px 24px",display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1.4fr)",gap:32,alignItems:"start"}}>
+
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <h1 style={{fontSize:32,fontWeight:800,color:"#111827",lineHeight:1.2,margin:"0 0 8px"}}>Don't guess at the warehouse.</h1>
+
+          <p style={{fontSize:12,color:"#92400E",margin:"0 0 16px",lineHeight:1.6,background:"#FFFBEB",border:"1px solid #FDE68A",borderLeft:"3px solid #F59E0B",borderRadius:"0 6px 6px 0",padding:"8px 12px",display:"flex",gap:8,alignItems:"flex-start"}}>
+            <span style={{flexShrink:0,fontSize:14}}>⚠️</span>
+            <span>This tool provides the best approximation, there could be cases where the product might not fit.</span>
+          </p>
+
+          <p style={{fontSize:15,color:"#6B7280",margin:"0 0 28px",lineHeight:1.6}}>
+            Enter the package box dimensions from retailers like <strong>IKEA</strong>, <strong>Home Depot</strong>, <strong>Canadian Tire</strong> and more — then check if everything fits in your car boot.
+          </p>
+
+          {/* ── Products card ── */}
+          <Card>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+              <StepBadge n={1}/>
+              <span style={{fontWeight:700,fontSize:16}}>Your Products</span>
+            </div>
+
+            <div style={{marginBottom:12}}>
+              <Label>Product Name</Label>
+              <Input placeholder="e.g. KALLAX Shelf Unit, Tool Cabinet…" value={form.name}
+                onChange={e=>setForm(f=>({...f,name:e.target.value}))}
+                onKeyDown={e=>e.key==="Enter"&&canAdd&&addProduct()}/>
+            </div>
+
+            <div style={{marginBottom:8}}>
+              <Label>Box Dimensions (cm) — find these on the product page under "Packaging"</Label>
+            </div>
+
+            {form.packages.map((pkg,i)=>(
+              <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,marginBottom:8,alignItems:"center"}}>
+                <div>
+                  {i===0&&<div style={{fontSize:10,color:"#9CA3AF",marginBottom:3,fontWeight:600,letterSpacing:"0.06em"}}>LENGTH</div>}
+                  <Input placeholder="L" value={pkg.l} onChange={e=>updatePkg(i,"l",e.target.value)} style={{padding:"9px 10px"}}/>
+                </div>
+                <div>
+                  {i===0&&<div style={{fontSize:10,color:"#9CA3AF",marginBottom:3,fontWeight:600,letterSpacing:"0.06em"}}>WIDTH</div>}
+                  <Input placeholder="W" value={pkg.w} onChange={e=>updatePkg(i,"w",e.target.value)} style={{padding:"9px 10px"}}/>
+                </div>
+                <div>
+                  {i===0&&<div style={{fontSize:10,color:"#9CA3AF",marginBottom:3,fontWeight:600,letterSpacing:"0.06em"}}>HEIGHT</div>}
+                  <Input placeholder="H" value={pkg.h} onChange={e=>updatePkg(i,"h",e.target.value)} style={{padding:"9px 10px"}}/>
+                </div>
+                <div style={{paddingTop:i===0?18:0}}>
+                  {form.packages.length>1&&(
+                    <button onClick={()=>removePkg(i)} style={{background:"none",border:"1.5px solid #E5E7EB",borderRadius:6,color:"#9CA3AF",cursor:"pointer",fontSize:16,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>×</button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {form.packages.length>0&&(
+              <div style={{fontSize:11,color:"#9CA3AF",marginBottom:8}}>
+                Package {form.packages.length} of {form.packages.length} — products with multiple boxes (e.g. flat-pack furniture) can have more than one.
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:8,marginTop:4,marginBottom:formError?8:0}}>
+              <button onClick={addPackage} style={{flex:1,background:"#F9FAFB",color:"#6B7280",border:"1.5px dashed #D1D5DB",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                + Add another box
+              </button>
+              <button onClick={addProduct} disabled={!canAdd}
+                style={{flex:1,background:canAdd?"#1E3A5F":"#F3F4F6",color:canAdd?"#fff":"#9CA3AF",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:canAdd?"pointer":"not-allowed",fontFamily:"inherit",transition:"background 0.2s"}}>
+                + Add Product
+              </button>
+            </div>
+            {formError&&<div style={{fontSize:12,color:"#EF4444",marginTop:4}}>{formError}</div>}
+
+            {products.length>0&&(
+              <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:10}}>
+                {products.map(p=>(
+                  <div key={p.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 14px",background:"#F9FAFB",borderRadius:10,border:"1.5px solid #E5E7EB",borderLeft:`3px solid ${p.color}`}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:600,color:"#111827",marginBottom:6}}>{p.name}</div>
+                      <div style={{fontSize:12,color:"#9CA3AF",marginBottom:6}}>
+                        {p.boxes.length} package{p.boxes.length!==1?"s":""} · {p.boxes.reduce((s,b)=>s+b.l*b.w*b.h/1e6,0).toFixed(3)} m³
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                        {p.boxes.map((b,i)=>(
+                          <span key={i} style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:99,background:p.color+"18",color:p.color,border:`1px solid ${p.color}44`,letterSpacing:"0.03em"}}>
+                            {b.l}×{b.w}×{b.h} cm
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={()=>removeProduct(p.id)} style={{background:"none",border:"none",color:"#9CA3AF",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 4px",flexShrink:0,fontFamily:"inherit"}} title="Remove">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* ── Car card ── */}
+          <Card style={{marginTop:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+              <StepBadge n={2}/>
+              <span style={{fontWeight:700,fontSize:16}}>Your Car</span>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div>
+                <Label>Make</Label>
+                <SelectInput value={make} onChange={e=>{setMake(e.target.value);setModel("");setYear("");setResult(null);}}>
+                  <option value="">Select Make</option>
+                  {makes.map(m=><option key={m} value={m}>{m}</option>)}
+                </SelectInput>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>
+                  <Label>Model</Label>
+                  <SelectInput value={model} onChange={e=>{setModel(e.target.value);setYear("");setResult(null);}} disabled={!make}>
+                    <option value="">Select Model</option>
+                    {models.map(m=><option key={m} value={m}>{m}</option>)}
+                  </SelectInput>
+                </div>
+                <div>
+                  <Label>Year</Label>
+                  <SelectInput value={year} onChange={e=>{setYear(e.target.value);setResult(null);}} disabled={!model}>
+                    <option value="">Select Year</option>
+                    {years.map(y=><option key={y} value={y}>{y}</option>)}
+                  </SelectInput>
+                </div>
+              </div>
+              {cargo&&(
+                <div style={{background:"#EFF6FF",border:"1.5px solid #BFDBFE",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#1E40AF"}}>
+                  <div style={{fontWeight:700,marginBottom:4}}>{make} {model} {year} · {carType}</div>
+                  <div style={{color:"#3B82F6"}}>Boot space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
+                  <div style={{color:"#93C5FD",fontSize:11,marginTop:4}}>* Approximate. Rear seats may need to be folded.</div>
+                </div>
+              )}
+            </div>
+            <button onClick={checkFit} disabled={!canCheck}
+              style={{width:"100%",marginTop:20,padding:"14px",borderRadius:10,border:"none",background:canCheck?"#1E3A5F":"#F3F4F6",color:canCheck?"#fff":"#9CA3AF",fontWeight:700,fontSize:15,cursor:canCheck?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontFamily:"inherit",transition:"background 0.2s"}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              Check if it fits →
+            </button>
+          </Card>
+        </div>
+
+        {/* Right panel */}
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {result&&(
+            <div style={{borderRadius:12,padding:"20px 24px",display:"flex",alignItems:"center",gap:16,background:result.fits?"#ECFDF5":"#FEF2F2",border:`2px solid ${result.fits?"#6EE7B7":"#FCA5A5"}`,animation:"slideDown 0.3s ease"}}>
+              <div style={{fontSize:40,lineHeight:1,flexShrink:0}}>{result.fits?"🎉":"📦"}</div>
+              <div>
+                <div style={{fontSize:20,fontWeight:800,color:result.fits?"#065F46":"#991B1B",marginBottom:4}}>
+                  {result.fits?"Yes — everything fits!":"Doesn't fit in the boot"}
+                </div>
+                <div style={{fontSize:14,color:result.fits?"#047857":"#B91C1C",lineHeight:1.5}}>
+                  {result.fits
+                    ?`All ${products.length} product(s) · ${arrRef.current.length} box${arrRef.current.length!==1?"es":""} total — fits in the ${make} ${model}.`
+                    :`"${result.failedBox?.productName||"A box"}" couldn't be placed. Try removing a product or picking a larger vehicle.`}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{background:"#fff",border:"2px dashed #D1D5DB",borderRadius:14,padding:result?20:0,minHeight:480,display:"flex",flexDirection:"column",gap:16}}>
+            {!result&&(
+              <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:40}}>
+                <div style={{width:72,height:72,borderRadius:16,background:"#F3F4F6",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+                  </svg>
+                </div>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:18,fontWeight:700,color:"#374151",marginBottom:6}}>Ready to Check</div>
+                  <div style={{fontSize:14,color:"#9CA3AF",lineHeight:1.6}}>Add your product dimensions and select your car<br/>to see if everything fits.</div>
+                </div>
+              </div>
+            )}
+
+            {result&&(
+              <>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+                  <div style={{fontSize:13,color:"#6B7280"}}>💡 Drag boxes in the top view to rearrange</div>
+                  <div style={{display:"flex",gap:6}}>
+                    {[["both","All"],["top","Top"],["side","Side"],["3d","3D"]].map(([v,lbl])=>(
+                      <button key={v} onClick={()=>setActiveView(v)} style={{padding:"6px 14px",borderRadius:8,border:"1.5px solid",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",borderColor:activeView===v?"#3B82F6":"#E5E7EB",background:activeView===v?"#EFF6FF":"#fff",color:activeView===v?"#2563EB":"#6B7280"}}>{lbl}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+                  {(activeView==="both"||activeView==="top")&&(
+                    <div style={{flex:1,minWidth:240}}>
+                      <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Top View — Looking Down</div>
+                      <canvas ref={topRef} width={560} height={400} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB",cursor:dragging!==null?"grabbing":"grab"}}
+                        onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onMU}/>
+                    </div>
+                  )}
+                  {(activeView==="both"||activeView==="side")&&(
+                    <div style={{flex:1,minWidth:240}}>
+                      <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Side View — From the Back</div>
+                      <canvas ref={sideRef} width={560} height={340} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB",cursor:"default"}}/>
+                    </div>
+                  )}
+                </div>
+
+                {(activeView==="both"||activeView==="3d")&&(
+                  <div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>3D View — Boot Opening</div>
+                    <canvas ref={threeRef} width={860} height={520} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB"}}/>
+                  </div>
+                )}
+
+                <div style={{display:"flex",flexWrap:"wrap",gap:12}}>
+                  {products.map(p=>(
+                    <div key={p.id} style={{display:"flex",alignItems:"center",gap:7,fontSize:13,color:"#374151",cursor:"default"}} onMouseEnter={()=>setHlId(`${p.id}-0`)} onMouseLeave={()=>setHlId(null)}>
+                      <div style={{width:12,height:12,borderRadius:3,background:p.color,flexShrink:0}}/>
+                      <span style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:500}}>{p.name}</span>
+                      <span style={{color:"#9CA3AF",fontSize:12}}>({p.boxes.length} pkg)</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{background:"#F9FAFB",borderRadius:10,padding:"14px 16px",border:"1.5px solid #E5E7EB"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:12}}>Packing Summary</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:12}}>
+                    {arrRef.current.map((b,i)=>(
+                      <div key={i} style={{borderLeft:`3px solid ${b.color}`,paddingLeft:10}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"#111827",marginBottom:2}}>{b.productName?.substring(0,22)}</div>
+                        <div style={{fontSize:12,color:"#6B7280"}}>{b.rl}×{b.rw}×{b.rh} cm</div>
+                        <div style={{fontSize:11,color:"#9CA3AF"}}>x{Math.round(b.x)} y{Math.round(b.y)} z{Math.round(b.z)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes slideDown { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+        * { box-sizing: border-box; }
+        select:disabled { opacity: 0.5; cursor: not-allowed; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #F3F4F6; }
+        ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+      `}</style>
+    </div>
+  );
+}
