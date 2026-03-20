@@ -1,6 +1,7 @@
 import * as THREE from "three";
-const _r3dCache = new WeakMap(); // Three.js scene cache keyed by canvas element
 import { useState, useRef, useEffect, useCallback } from "react";
+
+const _r3dCache = new WeakMap(); // Three.js scene cache keyed by canvas element
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 const range = (s, e) => Array.from({ length: e - s + 1 }, (_, i) => s + i);
