@@ -11,4 +11,8 @@ export default defineConfig({
   build: {
     outDir: "dist",
   },
+  optimizeDeps: {
+    include: ["three"],
+    exclude: ["@anthropic-ai/sdk", "express"],
+  },
 });
