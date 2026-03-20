@@ -3,6 +3,17 @@ import { useState, useRef, useEffect, useCallback } from "react";
 
 const _r3dCache = new WeakMap(); // Three.js scene cache keyed by canvas element
 
+/* ─── responsive hook ────────────────────────────────────────────────────── */
+function useWindowWidth() {
+  const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
+  useEffect(() => {
+    const handler = () => setW(window.innerWidth);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return w;
+}
+
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 const range = (s, e) => Array.from({ length: e - s + 1 }, (_, i) => s + i);
 const BOX_COLORS = [
@@ -454,6 +465,9 @@ export default function App() {
   const [activeView,setActiveView]     = useState("both");
   const [showConfetti,setShowConfetti] = useState(false);
 
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 640;
+
   const topRef=useRef(null),sideRef=useRef(null),threeRef=useRef(null),arrRef=useRef([]),dragRef=useRef(null);
 
   const makes  = Object.keys(CARS).sort();
@@ -535,20 +549,20 @@ export default function App() {
           </svg>
         </div>
         <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
-        <span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Boot Space Checker</span>
+        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Boot Space Checker</span>}
       </nav>
 
-      <div style={{maxWidth:1280,margin:"0 auto",padding:"40px 24px",display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1.4fr)",gap:32,alignItems:"start"}}>
+      <div style={{maxWidth:1280,margin:"0 auto",padding:isMobile?"16px":"40px 24px",display:"grid",gridTemplateColumns:isMobile?"1fr":"minmax(0,1fr) minmax(0,1.4fr)",gap:isMobile?16:32,alignItems:"start"}}>
 
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <h1 style={{fontSize:32,fontWeight:800,color:"#111827",lineHeight:1.2,margin:"0 0 8px"}}>Don't guess at the warehouse.</h1>
+          <h1 style={{fontSize:isMobile?22:32,fontWeight:800,color:"#111827",lineHeight:1.2,margin:"0 0 8px"}}>Don't guess at the warehouse.</h1>
 
           <p style={{fontSize:12,color:"#92400E",margin:"0 0 16px",lineHeight:1.6,background:"#FFFBEB",border:"1px solid #FDE68A",borderLeft:"3px solid #F59E0B",borderRadius:"0 6px 6px 0",padding:"8px 12px",display:"flex",gap:8,alignItems:"flex-start"}}>
             <span style={{flexShrink:0,fontSize:14}}>⚠️</span>
             <span>This tool provides the best approximation, there could be cases where the product might not fit.</span>
           </p>
 
-          <p style={{fontSize:15,color:"#6B7280",margin:"0 0 28px",lineHeight:1.6}}>
+          <p style={{fontSize:isMobile?13:15,color:"#6B7280",margin:isMobile?"0 0 16px":"0 0 28px",lineHeight:1.6}}>
             Enter the package box dimensions from retailers like <strong>IKEA</strong>, <strong>Home Depot</strong>, <strong>Canadian Tire</strong> and more — then check if everything fits in your car boot.
           </p>
 
@@ -571,7 +585,7 @@ export default function App() {
             </div>
 
             {form.packages.map((pkg,i)=>(
-              <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,marginBottom:8,alignItems:"center"}}>
+              <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:isMobile?6:8,marginBottom:8,alignItems:"center"}}>
                 <div>
                   {i===0&&<div style={{fontSize:10,color:"#9CA3AF",marginBottom:3,fontWeight:600,letterSpacing:"0.06em"}}>LENGTH</div>}
                   <Input placeholder="L" value={pkg.l} onChange={e=>updatePkg(i,"l",e.target.value)} style={{padding:"9px 10px"}}/>
@@ -684,10 +698,10 @@ export default function App() {
         {/* Right panel */}
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
           {result&&(
-            <div style={{borderRadius:12,padding:"20px 24px",display:"flex",alignItems:"center",gap:16,background:result.fits?"#ECFDF5":"#FEF2F2",border:`2px solid ${result.fits?"#6EE7B7":"#FCA5A5"}`,animation:"slideDown 0.3s ease"}}>
-              <div style={{fontSize:40,lineHeight:1,flexShrink:0}}>{result.fits?"🎉":"📦"}</div>
+            <div style={{borderRadius:12,padding:isMobile?"14px":"20px 24px",display:"flex",alignItems:"center",gap:isMobile?12:16,background:result.fits?"#ECFDF5":"#FEF2F2",border:`2px solid ${result.fits?"#6EE7B7":"#FCA5A5"}`,animation:"slideDown 0.3s ease"}}>
+              <div style={{fontSize:isMobile?28:40,lineHeight:1,flexShrink:0}}>{result.fits?"🎉":"📦"}</div>
               <div>
-                <div style={{fontSize:20,fontWeight:800,color:result.fits?"#065F46":"#991B1B",marginBottom:4}}>
+                <div style={{fontSize:isMobile?16:20,fontWeight:800,color:result.fits?"#065F46":"#991B1B",marginBottom:4}}>
                   {result.fits?"Yes — everything fits!":"Doesn't fit in the boot"}
                 </div>
                 <div style={{fontSize:14,color:result.fits?"#047857":"#B91C1C",lineHeight:1.5}}>
@@ -699,9 +713,9 @@ export default function App() {
             </div>
           )}
 
-          <div style={{background:"#fff",border:"2px dashed #D1D5DB",borderRadius:14,padding:result?20:0,minHeight:480,display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{background:"#fff",border:"2px dashed #D1D5DB",borderRadius:14,padding:result?(isMobile?14:20):0,minHeight:isMobile?0:480,display:"flex",flexDirection:"column",gap:16}}>
             {!result&&(
-              <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:40}}>
+              <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:14,padding:isMobile?24:40}}>
                 <div style={{width:72,height:72,borderRadius:16,background:"#F3F4F6",display:"flex",alignItems:"center",justifyContent:"center"}}>
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
@@ -716,25 +730,25 @@ export default function App() {
 
             {result&&(
               <>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
-                  <div style={{fontSize:13,color:"#6B7280"}}>💡 Drag boxes in the top view to rearrange</div>
-                  <div style={{display:"flex",gap:6}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                  {!isMobile&&<div style={{fontSize:13,color:"#6B7280"}}>💡 Drag boxes in the top view to rearrange</div>}
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     {[["both","All"],["top","Top"],["side","Side"],["3d","3D"]].map(([v,lbl])=>(
-                      <button key={v} onClick={()=>setActiveView(v)} style={{padding:"6px 14px",borderRadius:8,border:"1.5px solid",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",borderColor:activeView===v?"#3B82F6":"#E5E7EB",background:activeView===v?"#EFF6FF":"#fff",color:activeView===v?"#2563EB":"#6B7280"}}>{lbl}</button>
+                      <button key={v} onClick={()=>setActiveView(v)} style={{padding:isMobile?"6px 10px":"6px 14px",borderRadius:8,border:"1.5px solid",fontSize:isMobile?12:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",borderColor:activeView===v?"#3B82F6":"#E5E7EB",background:activeView===v?"#EFF6FF":"#fff",color:activeView===v?"#2563EB":"#6B7280"}}>{lbl}</button>
                     ))}
                   </div>
                 </div>
 
                 <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
                   {(activeView==="both"||activeView==="top")&&(
-                    <div style={{flex:1,minWidth:240}}>
+                    <div style={{flex:1,minWidth:isMobile?0:240}}>
                       <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Top View — Looking Down</div>
                       <canvas ref={topRef} width={560} height={400} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB",cursor:dragging!==null?"grabbing":"grab"}}
                         onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onMU}/>
                     </div>
                   )}
                   {(activeView==="both"||activeView==="side")&&(
-                    <div style={{flex:1,minWidth:240}}>
+                    <div style={{flex:1,minWidth:isMobile?0:240}}>
                       <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Side View — From the Back</div>
                       <canvas ref={sideRef} width={560} height={340} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB",cursor:"default"}}/>
                     </div>
@@ -760,7 +774,7 @@ export default function App() {
 
                 <div style={{background:"#F9FAFB",borderRadius:10,padding:"14px 16px",border:"1.5px solid #E5E7EB"}}>
                   <div style={{fontSize:11,fontWeight:700,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:12}}>Packing Summary</div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:12}}>
+                  <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile?140:175}px,1fr))`,gap:12}}>
                     {arrRef.current.map((b,i)=>(
                       <div key={i} style={{borderLeft:`3px solid ${b.color}`,paddingLeft:10}}>
                         <div style={{fontSize:13,fontWeight:600,color:"#111827",marginBottom:2}}>{b.productName?.substring(0,22)}</div>
@@ -780,6 +794,8 @@ export default function App() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideDown { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing: border-box; }
+        button, a { touch-action: manipulation; }
+        input, select, textarea { font-size: 16px !important; }
         select:disabled { opacity: 0.5; cursor: not-allowed; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #F3F4F6; }
