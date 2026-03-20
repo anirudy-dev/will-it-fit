@@ -549,7 +549,7 @@ export default function App() {
           </svg>
         </div>
         <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
-        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Boot Space Checker</span>}
+        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Trunk Space Checker</span>}
       </nav>
 
       <div style={{maxWidth:1280,margin:"0 auto",padding:isMobile?"16px":"40px 24px",display:"grid",gridTemplateColumns:isMobile?"1fr":"minmax(0,1fr) minmax(0,1.4fr)",gap:isMobile?16:32,alignItems:"start"}}>
@@ -563,7 +563,7 @@ export default function App() {
           </p>
 
           <p style={{fontSize:isMobile?13:15,color:"#6B7280",margin:isMobile?"0 0 16px":"0 0 28px",lineHeight:1.6}}>
-            Enter the package box dimensions from retailers like <strong>IKEA</strong>, <strong>Home Depot</strong>, <strong>Canadian Tire</strong> and more — then check if everything fits in your car boot.
+            Enter the package box dimensions from retailers like <strong>IKEA</strong>, <strong>Home Depot</strong>, <strong>Canadian Tire</strong> and more — then check if everything fits in your car trunk.
           </p>
 
           {/* ── Products card ── */}
@@ -680,7 +680,7 @@ export default function App() {
               {cargo&&(
                 <div style={{background:"#EFF6FF",border:"1.5px solid #BFDBFE",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#1E40AF"}}>
                   <div style={{fontWeight:700,marginBottom:4}}>{make} {model} {year} · {carType}</div>
-                  <div style={{color:"#3B82F6"}}>Boot space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
+                  <div style={{color:"#3B82F6"}}>Trunk space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
                   <div style={{color:"#93C5FD",fontSize:11,marginTop:4}}>* Approximate. Rear seats may need to be folded.</div>
                 </div>
               )}
@@ -702,7 +702,7 @@ export default function App() {
               <div style={{fontSize:isMobile?28:40,lineHeight:1,flexShrink:0}}>{result.fits?"🎉":"📦"}</div>
               <div>
                 <div style={{fontSize:isMobile?16:20,fontWeight:800,color:result.fits?"#065F46":"#991B1B",marginBottom:4}}>
-                  {result.fits?"Yes — everything fits!":"Doesn't fit in the boot"}
+                  {result.fits?"Yes — everything fits!":"Doesn't fit in the trunk"}
                 </div>
                 <div style={{fontSize:14,color:result.fits?"#047857":"#B91C1C",lineHeight:1.5}}>
                   {result.fits
@@ -757,7 +757,7 @@ export default function App() {
 
                 {(activeView==="both"||activeView==="3d")&&(
                   <div>
-                    <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>3D View — Boot Opening</div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>3D View — Trunk Opening</div>
                     <canvas ref={threeRef} width={860} height={520} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB"}}/>
                   </div>
                 )}
