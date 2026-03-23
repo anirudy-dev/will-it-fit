@@ -511,18 +511,34 @@ export default function App() {
               },
               {
                 type: "text",
-                text: `Look at this product page screenshot. Extract the PACKAGING dimensions (the box the product ships in — NOT the assembled product size).
+                text: `You are extracting packaging box dimensions from a product page screenshot.
+
+Look at the screenshot and find any dimensions that describe the SHIPPING BOX or PACKAGE — these are the physical measurements of the box the product arrives in.
+
+Common labels to look for (any of these count):
+- Width / Height / Length / Depth (when shown alongside "Package(s)" count or weight)
+- "Package dimensions", "Box dimensions", "Shipping dimensions"
+- "Package 1", "Package 2" etc (multiple boxes)
+- Any table or list of dimensions near a "Package(s):" or "Weight:" field
+
+IMPORTANT: If you see Width, Height, Length values alongside a "Package(s):" count and/or a weight in kg/lb — those ARE the packaging dimensions. Extract them.
+
+Map the values as follows:
+- l = Length (the longest dimension)
+- w = Width
+- h = Height
+- Convert inches to centimetres (× 2.54, round to nearest integer)
+- Round all values to the nearest integer
+
+If there are multiple packages (Package 1, Package 2 etc) include each as a separate object in the boxes array.
+
+Also extract the product name if visible on the page. If no product name is visible, use an empty string.
 
 Return ONLY valid JSON, no markdown, no explanation:
-{"name":"Product Name","boxes":[{"l":100,"w":40,"h":20},{"l":80,"w":30,"h":15}]}
+{"name":"Product Name","boxes":[{"l":86,"w":37,"h":21}]}
 
-Rules:
-- "name" = the product name from the page
-- "boxes" = array of package boxes (most products have 1, flat-pack furniture may have 2-4)
-- All dimensions in centimetres. Convert from inches if needed (× 2.54, round to nearest integer)
-- Look for a section labelled "Packaging", "Package dimensions", "Box size", "Shipping dimensions"
-- If you see "Package 1", "Package 2" etc — include each as a separate box in the array
-- If you cannot find packaging dimensions, return: {"error":"No packaging dimensions found"}`,
+If there are truly no dimensions of any kind visible in the screenshot, return:
+{"error":"No dimensions visible in screenshot"}`,
               },
             ],
           }],
