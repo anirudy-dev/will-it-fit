@@ -17,8 +17,8 @@ export default async function handler(req, res) {
     const response = await client.messages.create({
       model,
       max_tokens,
-      system,
-      tools,
+      ...(system   && { system }),
+      ...(tools    && { tools }),
       messages,
     });
     res.json(response);

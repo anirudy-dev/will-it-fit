@@ -456,6 +456,9 @@ export default function App() {
   const [products,setProducts]         = useState([]);
   const [form,setForm]                 = useState(emptyForm());
   const [formError,setFormError]       = useState("");
+  const [scanLoading,setScanLoading]   = useState(false);
+  const [scanError,setScanError]       = useState("");
+  const [scanPreview,setScanPreview]   = useState(null);
   const [make,setMake]                 = useState("");
   const [model,setModel]               = useState("");
   const [year,setYear]                 = useState("");
@@ -479,6 +482,80 @@ export default function App() {
   const updatePkg = (i,field,val) => setForm(f=>({...f,packages:f.packages.map((p,idx)=>idx===i?{...p,[field]:val}:p)}));
   const addPackage = () => setForm(f=>({...f,packages:[...f.packages,{l:"",w:"",h:""}]}));
   const removePkg  = i => setForm(f=>({...f,packages:f.packages.filter((_,idx)=>idx!==i)}));
+
+  const scanScreenshot = async (file) => {
+    if (!file || !file.type.startsWith("image/")) { setScanError("Please upload an image file."); return; }
+    setScanLoading(true); setScanError(""); setScanPreview(URL.createObjectURL(file));
+
+    // Convert image to base64
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(",")[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+
+    try {
+      const resp = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1024,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: file.type, data: base64 },
+              },
+              {
+                type: "text",
+                text: `Look at this product page screenshot. Extract the PACKAGING dimensions (the box the product ships in — NOT the assembled product size).
+
+Return ONLY valid JSON, no markdown, no explanation:
+{"name":"Product Name","boxes":[{"l":100,"w":40,"h":20},{"l":80,"w":30,"h":15}]}
+
+Rules:
+- "name" = the product name from the page
+- "boxes" = array of package boxes (most products have 1, flat-pack furniture may have 2-4)
+- All dimensions in centimetres. Convert from inches if needed (× 2.54, round to nearest integer)
+- Look for a section labelled "Packaging", "Package dimensions", "Box size", "Shipping dimensions"
+- If you see "Package 1", "Package 2" etc — include each as a separate box in the array
+- If you cannot find packaging dimensions, return: {"error":"No packaging dimensions found"}`,
+              },
+            ],
+          }],
+        }),
+      });
+
+      if (!resp.ok) throw new Error(`API error ${resp.status}`);
+      const data = await resp.json();
+      const raw = data.content.filter(c => c.type === "text").map(c => c.text).join("");
+      const stripped = raw.replace(/```(?:json)?\s*/gi,"").replace(/```/g,"").trim();
+      let json;
+      try { json = JSON.parse(stripped); }
+      catch { const m = stripped.match(/\{[\s\S]*\}/); if (m) json = JSON.parse(m[0]); else throw new Error("Could not parse response"); }
+
+      if (json.error) throw new Error(json.error);
+      if (!json.boxes?.length) throw new Error("No packaging dimensions found in this screenshot");
+
+      // Auto-fill the form
+      setForm({
+        name: json.name || "",
+        packages: json.boxes.map(b => ({ l: String(b.l), w: String(b.w), h: String(b.h) })),
+      });
+      setScanError("");
+    } catch (err) {
+      setScanError(err.message || "Could not read dimensions. Try a clearer screenshot.");
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const onScanFile = (file) => scanScreenshot(file);
+  const onScanDrop = (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) onScanFile(f); };
+  const onScanDragOver = (e) => e.preventDefault();
 
   const addProduct = () => {
     setFormError("");
@@ -549,7 +626,7 @@ export default function App() {
           </svg>
         </div>
         <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
-        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Trunk Space Checker</span>}
+        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Boot Space Checker</span>}
       </nav>
 
       <div style={{maxWidth:1280,margin:"0 auto",padding:isMobile?"16px":"40px 24px",display:"grid",gridTemplateColumns:isMobile?"1fr":"minmax(0,1fr) minmax(0,1.4fr)",gap:isMobile?16:32,alignItems:"start"}}>
@@ -563,7 +640,7 @@ export default function App() {
           </p>
 
           <p style={{fontSize:isMobile?13:15,color:"#6B7280",margin:isMobile?"0 0 16px":"0 0 28px",lineHeight:1.6}}>
-            Enter the package box dimensions from retailers like <strong>IKEA</strong>, <strong>Home Depot</strong>, <strong>Canadian Tire</strong> and more — then check if everything fits in your car trunk.
+            Screenshot the packaging section of any product page — from <strong>IKEA</strong>, <strong>Home Depot</strong>, <strong>Canadian Tire</strong> and more — and we'll read the dimensions automatically.
           </p>
 
           {/* ── Products card ── */}
@@ -573,6 +650,85 @@ export default function App() {
               <span style={{fontWeight:700,fontSize:16}}>Your Products</span>
             </div>
 
+            {/* ── Screenshot upload zone ── */}
+            <div style={{marginBottom:16}}>
+              <Label>📸 Screenshot Auto-fill</Label>
+              <div
+                onDrop={onScanDrop}
+                onDragOver={onScanDragOver}
+                onClick={()=>!scanLoading&&document.getElementById("screenshotInput").click()}
+                style={{
+                  border:`2px dashed ${scanLoading?"#93C5FD":scanPreview?"#6EE7B7":"#D1D5DB"}`,
+                  borderRadius:10,
+                  padding:scanPreview?"10px":"20px 16px",
+                  textAlign:"center",
+                  cursor:scanLoading?"default":"pointer",
+                  background:scanLoading?"#EFF6FF":scanPreview?"#F0FDF4":"#FAFAFA",
+                  transition:"all 0.2s",
+                  position:"relative",
+                  minHeight:scanPreview?0:88,
+                  display:"flex",
+                  flexDirection:scanPreview?"row":"column",
+                  alignItems:"center",
+                  justifyContent:"center",
+                  gap:10,
+                }}>
+                <input
+                  id="screenshotInput"
+                  type="file"
+                  accept="image/*"
+                  style={{display:"none"}}
+                  onChange={e=>{ if(e.target.files[0]) onScanFile(e.target.files[0]); e.target.value=""; }}
+                />
+                {scanLoading ? (
+                  <>
+                    <div style={{width:20,height:20,border:"2.5px solid #3B82F6",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite",flexShrink:0}}/>
+                    <span style={{fontSize:13,color:"#3B82F6",fontWeight:600}}>Reading dimensions…</span>
+                  </>
+                ) : scanPreview ? (
+                  <>
+                    <img src={scanPreview} alt="preview" style={{width:52,height:52,objectFit:"cover",borderRadius:6,flexShrink:0,border:"1.5px solid #D1FAE5"}}/>
+                    <div style={{flex:1,textAlign:"left",minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#065F46",marginBottom:2}}>✓ Screenshot scanned</div>
+                      <div style={{fontSize:11,color:"#6B7280"}}>Tap to replace with a different screenshot</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{fontSize:28,lineHeight:1}}>📷</div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:"#374151",marginBottom:2}}>
+                        {isMobile ? "Tap to upload a screenshot" : "Drop a screenshot here or click to upload"}
+                      </div>
+                      <div style={{fontSize:11,color:"#9CA3AF"}}>
+                        Screenshot the packaging section of any retailer's product page
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              {scanError&&(
+                <div style={{fontSize:12,color:"#EF4444",marginTop:6,display:"flex",gap:6,alignItems:"flex-start"}}>
+                  <span style={{flexShrink:0}}>⚠️</span>
+                  <span>{scanError} — you can still enter dimensions manually below.</span>
+                </div>
+              )}
+              {/* How-to hint */}
+              {!scanPreview&&!scanLoading&&(
+                <div style={{fontSize:11,color:"#9CA3AF",marginTop:6,lineHeight:1.5}}>
+                  💡 On IKEA or Home Depot: scroll to the "Packaging" section on the product page → screenshot it → upload here.
+                </div>
+              )}
+            </div>
+
+            {/* ── Divider ── */}
+            <div style={{display:"flex",alignItems:"center",gap:10,margin:"4px 0 16px"}}>
+              <div style={{flex:1,height:1,background:"#E5E7EB"}}/>
+              <span style={{fontSize:11,color:"#9CA3AF",fontWeight:600,letterSpacing:"0.06em"}}>OR ENTER MANUALLY</span>
+              <div style={{flex:1,height:1,background:"#E5E7EB"}}/>
+            </div>
+
+            {/* ── Manual fields ── */}
             <div style={{marginBottom:12}}>
               <Label>Product Name</Label>
               <Input placeholder="e.g. KALLAX Shelf Unit, Tool Cabinet…" value={form.name}
@@ -680,7 +836,7 @@ export default function App() {
               {cargo&&(
                 <div style={{background:"#EFF6FF",border:"1.5px solid #BFDBFE",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#1E40AF"}}>
                   <div style={{fontWeight:700,marginBottom:4}}>{make} {model} {year} · {carType}</div>
-                  <div style={{color:"#3B82F6"}}>Trunk space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
+                  <div style={{color:"#3B82F6"}}>Boot space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
                   <div style={{color:"#93C5FD",fontSize:11,marginTop:4}}>* Approximate. Rear seats may need to be folded.</div>
                 </div>
               )}
@@ -702,7 +858,7 @@ export default function App() {
               <div style={{fontSize:isMobile?28:40,lineHeight:1,flexShrink:0}}>{result.fits?"🎉":"📦"}</div>
               <div>
                 <div style={{fontSize:isMobile?16:20,fontWeight:800,color:result.fits?"#065F46":"#991B1B",marginBottom:4}}>
-                  {result.fits?"Yes — everything fits!":"Doesn't fit in the trunk"}
+                  {result.fits?"Yes — everything fits!":"Doesn't fit in the boot"}
                 </div>
                 <div style={{fontSize:14,color:result.fits?"#047857":"#B91C1C",lineHeight:1.5}}>
                   {result.fits
@@ -757,7 +913,7 @@ export default function App() {
 
                 {(activeView==="both"||activeView==="3d")&&(
                   <div>
-                    <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>3D View — Trunk Opening</div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>3D View — Boot Opening</div>
                     <canvas ref={threeRef} width={860} height={520} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB"}}/>
                   </div>
                 )}
