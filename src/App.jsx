@@ -691,8 +691,18 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
     renderView(topRef.current,cargo,arrRef.current,"top",hl);
     renderView(sideRef.current,cargo,arrRef.current,"side",hl);
     render3D(threeRef.current,cargo,arrRef.current,hl,carType);
-  },[result,cargo,hlId]);
+  },[result,cargo,hlId,carType]);
+
+  // Redraw when result changes
   useEffect(()=>{redraw();},[redraw]);
+
+  // Redraw when activeView changes — canvases are unmounted/remounted by React
+  // so we need a tick delay to let the new canvas element attach to the DOM first
+  useEffect(()=>{
+    if(!result||!cargo) return;
+    const t = setTimeout(()=>redraw(), 0);
+    return ()=>clearTimeout(t);
+  },[activeView,result,cargo]);
 
   const getXY=(e,canvas)=>{
     const r=canvas.getBoundingClientRect(),sw=canvas.width/r.width,sh=canvas.height/r.height;
