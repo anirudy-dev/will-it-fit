@@ -614,6 +614,17 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
     if (!cargo) return;
     const ready = products.filter(p => p.boxes?.length);
     if (!ready.length) return;
+
+    // GTM — fire when user clicks Check if it fits
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "check_fit_clicked",
+      car_make: make,
+      car_model: model,
+      car_year: year,
+      car_type: carType,
+      product_count: ready.length,
+    });
     const boxes = ready.flatMap(p => p.boxes.map((b,i) => ({
       ...b, id:`${p.id}-${i}`, productId:p.id, productName:p.name, color:p.color, assembled:p.assembled||false,
     })));
@@ -623,6 +634,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
     if (normal.fits) {
       arrRef.current = normal.arrangement;
       setResult({ fits:true, fitsFolded:false, fitsDisassembled:false, arrangement:normal.arrangement });
+      window.dataLayer.push({ event:"check_fit_result", fit_result:"fits", car_make:make, car_model:model });
       setShowConfetti(false); setTimeout(()=>setShowConfetti(true), 30);
       return;
     }
@@ -633,6 +645,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
     if (folded.fits) {
       arrRef.current = folded.arrangement;
       setResult({ fits:false, fitsFolded:true, foldedCargo, arrangement:folded.arrangement, failedBox:normal.failedBox });
+      window.dataLayer.push({ event:"check_fit_result", fit_result:"fits_folded", car_make:make, car_model:model });
       setShowConfetti(false); setTimeout(()=>setShowConfetti(true), 30);
       return;
     }
@@ -669,6 +682,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
 
     arrRef.current = normal.arrangement;
     setResult({ fits:false, fitsFolded:false, fitsDisassembled, disassemblyNote, arrangement:normal.arrangement, failedBox:normal.failedBox });
+    window.dataLayer.push({ event:"check_fit_result", fit_result: fitsDisassembled ? "fits_disassembled" : "no_fit", car_make:make, car_model:model });
     setShowConfetti(false);
   };
 
