@@ -53,6 +53,15 @@ const CARS = {
 };
 Object.values(CARS).forEach(ms => Object.values(ms).forEach(m => { m.years = range(m.y[0], m.y[1]); }));
 
+/* ─── folded-seat cargo dimensions ──────────────────────────────────────── */
+// When rear seats are folded, the usable depth extends into the passenger area.
+// Width and height stay the same; depth (l) increases by a car-type multiplier.
+const FOLD_MULTIPLIER = { SUV:1.75, Hatchback:1.70, Minivan:1.85, Van:1.75, Wagon:1.80, Sedan:1.22, Truck:1.0 };
+function getFoldedCargo(cargo, carType) {
+  const mult = FOLD_MULTIPLIER[carType] ?? 1.55;
+  return { ...cargo, l: Math.round(cargo.l * mult) };
+}
+
 /* ─── packing ─────────────────────────────────────────────────────────────── */
 function packBoxes(inputBoxes, cargo) {
   const placed = [];
@@ -456,6 +465,9 @@ export default function App() {
   const [products,setProducts]         = useState([]);
   const [form,setForm]                 = useState(emptyForm());
   const [formError,setFormError]       = useState("");
+  const [itemType,setItemType]         = useState("boxed"); // "boxed" | "assembled"
+  const [assembledForm,setAssembledForm] = useState({name:"",l:"",w:"",h:""});
+  const [assembledError,setAssembledError] = useState("");
   const [scanLoading,setScanLoading]   = useState(false);
   const [scanError,setScanError]       = useState("");
   const [scanPreview,setScanPreview]   = useState(null);
@@ -482,6 +494,17 @@ export default function App() {
   const updatePkg = (i,field,val) => setForm(f=>({...f,packages:f.packages.map((p,idx)=>idx===i?{...p,[field]:val}:p)}));
   const addPackage = () => setForm(f=>({...f,packages:[...f.packages,{l:"",w:"",h:""}]}));
   const removePkg  = i => setForm(f=>({...f,packages:f.packages.filter((_,idx)=>idx!==i)}));
+
+  const addAssembledProduct = () => {
+    setAssembledError("");
+    const {name,l,w,h} = assembledForm;
+    if (!name.trim()) { setAssembledError("Please enter a product name."); return; }
+    if (!l||!w||!h||isNaN(+l)||isNaN(+w)||isNaN(+h)||+l<=0||+w<=0||+h<=0) { setAssembledError("All dimensions must be positive numbers."); return; }
+    const color = BOX_COLORS[products.length % BOX_COLORS.length];
+    setProducts(prev=>[...prev,{id:Date.now(),name:name.trim(),boxes:[{l:+l,w:+w,h:+h}],color,assembled:true}]);
+    setAssembledForm({name:"",l:"",w:"",h:""});
+    setResult(null);
+  };
 
   const scanScreenshot = async (file) => {
     if (!file || !file.type.startsWith("image/")) { setScanError("Please upload an image file."); return; }
@@ -588,14 +611,65 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
   const removeProduct = id=>{setProducts(p=>p.filter(x=>x.id!==id));setResult(null);};
 
   const checkFit = () => {
-    if(!cargo) return;
-    const ready=products.filter(p=>p.boxes?.length);
-    if(!ready.length) return;
-    const boxes=ready.flatMap(p=>p.boxes.map((b,i)=>({...b,id:`${p.id}-${i}`,productId:p.id,productName:p.name,color:p.color})));
-    const res=packBoxes(boxes,cargo);
-    arrRef.current=res.arrangement; setResult(res);
-    if(res.fits){setShowConfetti(false);setTimeout(()=>setShowConfetti(true),30);}
-    else setShowConfetti(false);
+    if (!cargo) return;
+    const ready = products.filter(p => p.boxes?.length);
+    if (!ready.length) return;
+    const boxes = ready.flatMap(p => p.boxes.map((b,i) => ({
+      ...b, id:`${p.id}-${i}`, productId:p.id, productName:p.name, color:p.color, assembled:p.assembled||false,
+    })));
+
+    // 1. Try normal boot
+    const normal = packBoxes(boxes, cargo);
+    if (normal.fits) {
+      arrRef.current = normal.arrangement;
+      setResult({ fits:true, fitsFolded:false, fitsDisassembled:false, arrangement:normal.arrangement });
+      setShowConfetti(false); setTimeout(()=>setShowConfetti(true), 30);
+      return;
+    }
+
+    // 2. Try with seats folded (only for car types that have foldable rear seats)
+    const foldedCargo = getFoldedCargo(cargo, carType);
+    const folded = (carType !== "Truck") ? packBoxes(boxes, foldedCargo) : { fits:false };
+    if (folded.fits) {
+      arrRef.current = folded.arrangement;
+      setResult({ fits:false, fitsFolded:true, foldedCargo, arrangement:folded.arrangement, failedBox:normal.failedBox });
+      setShowConfetti(false); setTimeout(()=>setShowConfetti(true), 30);
+      return;
+    }
+
+    // 3. Check if any assembled products could help if disassembled
+    const hasAssembled = ready.some(p => p.assembled);
+    let fitsDisassembled = false;
+    let disassemblyNote = "";
+    if (hasAssembled) {
+      // Heuristic: check if the assembled item's longest dimension is the blocker.
+      // If removing it from the equation allows everything else to fit, disassembly is the key suggestion.
+      const assembledProducts = ready.filter(p => p.assembled);
+      const nonAssembledBoxes = boxes.filter(b => !b.assembled);
+      const nonAssembledFit = nonAssembledBoxes.length > 0 ? packBoxes(nonAssembledBoxes, cargo) : { fits:true };
+
+      // Check if assembled item itself could fit if we split it differently —
+      // specifically if its volume fits but shape doesn't, disassembly might help
+      for (const ap of assembledProducts) {
+        const b = ap.boxes[0];
+        const dims = [b.l, b.w, b.h].sort((a,z)=>z-a); // largest first
+        const bootDims = [cargo.l, cargo.w, cargo.h].sort((a,z)=>z-a);
+        const bootFolded = [foldedCargo.l, foldedCargo.w, foldedCargo.h].sort((a,z)=>z-a);
+        // If longest dimension exceeds boot but volume could fit if broken into 2 pieces
+        if (dims[0] > bootDims[0] && dims[0] <= bootFolded[0] * 1.4) {
+          fitsDisassembled = true;
+          disassemblyNote = `"${ap.name}" is too large assembled. Disassembling it may allow it to fit${carType!=="Truck"?" — possibly with seats folded too":""}.`;
+        }
+      }
+      if (!fitsDisassembled && nonAssembledFit.fits) {
+        fitsDisassembled = true;
+        disassemblyNote = `Everything else fits, but the assembled item is too large. Try disassembling it first.`;
+      }
+    }
+
+    arrRef.current = normal.arrangement;
+    setResult({ fits:false, fitsFolded:false, fitsDisassembled, disassemblyNote, arrangement:normal.arrangement, failedBox:normal.failedBox });
+    setShowConfetti(false);
   };
 
   const redraw=useCallback((hl=hlId)=>{
@@ -630,6 +704,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
 
   const canCheck=cargo&&products.length>0;
   const canAdd=form.name.trim()&&form.packages.every(p=>p.l&&p.w&&p.h);
+  const canAddAssembled=assembledForm.name.trim()&&assembledForm.l&&assembledForm.w&&assembledForm.h;
 
   return (
     <div style={{fontFamily:"system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:"#F3F4F6",minHeight:"100vh",color:"#111827"}}>
@@ -665,6 +740,57 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
               <StepBadge n={1}/>
               <span style={{fontWeight:700,fontSize:16}}>Your Products</span>
             </div>
+
+            {/* ── Item type toggle ── */}
+            <div style={{marginBottom:16}}>
+              <Label>Is the item new in its box, or already assembled?</Label>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {[["boxed","📦 New / In box"],["assembled","🔧 Already assembled"]].map(([val,label])=>(
+                  <button key={val} onClick={()=>{setItemType(val);setFormError("");setAssembledError("");}}
+                    style={{padding:"10px 8px",borderRadius:8,border:`1.5px solid ${itemType===val?"#3B82F6":"#E5E7EB"}`,
+                      background:itemType===val?"#EFF6FF":"#fff",color:itemType===val?"#1D4ED8":"#6B7280",
+                      fontWeight:600,fontSize:isMobile?12:13,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",textAlign:"center"}}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Assembled item form ── */}
+            {itemType==="assembled"&&(
+              <div style={{marginBottom:12}}>
+                <div style={{background:"#F0F9FF",border:"1px solid #BAE6FD",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#0369A1",marginBottom:12,lineHeight:1.5}}>
+                  ℹ️ Enter the assembled dimensions of the item. The tool will also check if disassembling it would help it fit.
+                </div>
+                <div style={{marginBottom:10}}>
+                  <Label>Product Name</Label>
+                  <Input placeholder="e.g. IKEA BILLY Bookcase (assembled)"
+                    value={assembledForm.name}
+                    onChange={e=>setAssembledForm(f=>({...f,name:e.target.value}))}/>
+                </div>
+                <Label>Assembled Dimensions (cm)</Label>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:isMobile?6:8,marginBottom:8}}>
+                  {[["l","LENGTH"],["w","WIDTH"],["h","HEIGHT"]].map(([field,lbl])=>(
+                    <div key={field}>
+                      <div style={{fontSize:10,color:"#9CA3AF",marginBottom:3,fontWeight:600,letterSpacing:"0.06em"}}>{lbl}</div>
+                      <Input placeholder={field.toUpperCase()} value={assembledForm[field]}
+                        onChange={e=>setAssembledForm(f=>({...f,[field]:e.target.value}))}
+                        style={{padding:"9px 10px"}}/>
+                    </div>
+                  ))}
+                </div>
+                {assembledError&&<div style={{fontSize:12,color:"#EF4444",marginBottom:8}}>{assembledError}</div>}
+                <button onClick={addAssembledProduct} disabled={!canAddAssembled}
+                  style={{width:"100%",background:canAddAssembled?"#1E3A5F":"#F3F4F6",color:canAddAssembled?"#fff":"#9CA3AF",
+                    border:"none",borderRadius:8,padding:"10px",fontSize:13,fontWeight:600,
+                    cursor:canAddAssembled?"pointer":"not-allowed",fontFamily:"inherit",transition:"background 0.2s"}}>
+                  + Add Assembled Item
+                </button>
+              </div>
+            )}
+
+            {/* ── Boxed item: screenshot + manual fields ── */}
+            {itemType==="boxed"&&(<>
 
             {/* ── Screenshot upload zone ── */}
             <div style={{marginBottom:16}}>
@@ -795,12 +921,17 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
             </div>
             {formError&&<div style={{fontSize:12,color:"#EF4444",marginTop:4}}>{formError}</div>}
 
+            </>)} {/* end itemType===boxed */}
+
             {products.length>0&&(
               <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:10}}>
                 {products.map(p=>(
                   <div key={p.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 14px",background:"#F9FAFB",borderRadius:10,border:"1.5px solid #E5E7EB",borderLeft:`3px solid ${p.color}`}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,fontWeight:600,color:"#111827",marginBottom:6}}>{p.name}</div>
+                      <div style={{fontSize:14,fontWeight:600,color:"#111827",marginBottom:4,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        {p.name}
+                        {p.assembled&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"#FEF3C7",color:"#92400E",border:"1px solid #FDE68A"}}>ASSEMBLED</span>}
+                      </div>
                       <div style={{fontSize:12,color:"#9CA3AF",marginBottom:6}}>
                         {p.boxes.length} package{p.boxes.length!==1?"s":""} · {p.boxes.reduce((s,b)=>s+b.l*b.w*b.h/1e6,0).toFixed(3)} m³
                       </div>
@@ -870,17 +1001,46 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
         {/* Right panel */}
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
           {result&&(
-            <div style={{borderRadius:12,padding:isMobile?"14px":"20px 24px",display:"flex",alignItems:"center",gap:isMobile?12:16,background:result.fits?"#ECFDF5":"#FEF2F2",border:`2px solid ${result.fits?"#6EE7B7":"#FCA5A5"}`,animation:"slideDown 0.3s ease"}}>
-              <div style={{fontSize:isMobile?28:40,lineHeight:1,flexShrink:0}}>{result.fits?"🎉":"📦"}</div>
-              <div>
-                <div style={{fontSize:isMobile?16:20,fontWeight:800,color:result.fits?"#065F46":"#991B1B",marginBottom:4}}>
-                  {result.fits?"Yes — everything fits!":"Doesn't fit in the boot"}
-                </div>
-                <div style={{fontSize:14,color:result.fits?"#047857":"#B91C1C",lineHeight:1.5}}>
+            <div style={{borderRadius:12,padding:isMobile?"14px":"20px 24px",display:"flex",alignItems:"flex-start",gap:isMobile?12:16,
+              background: result.fits ? "#ECFDF5" : result.fitsFolded ? "#EFF6FF" : result.fitsDisassembled ? "#FFFBEB" : "#FEF2F2",
+              border:`2px solid ${result.fits?"#6EE7B7":result.fitsFolded?"#93C5FD":result.fitsDisassembled?"#FDE68A":"#FCA5A5"}`,
+              animation:"slideDown 0.3s ease"}}>
+              <div style={{fontSize:isMobile?28:40,lineHeight:1,flexShrink:0}}>
+                {result.fits?"🎉":result.fitsFolded?"🚗":result.fitsDisassembled?"🔧":"📦"}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:isMobile?16:20,fontWeight:800,marginBottom:4,
+                  color:result.fits?"#065F46":result.fitsFolded?"#1E40AF":result.fitsDisassembled?"#92400E":"#991B1B"}}>
                   {result.fits
-                    ?`All ${products.length} product(s) · ${arrRef.current.length} box${arrRef.current.length!==1?"es":""} total — fits in the ${make} ${model}.`
-                    :`"${result.failedBox?.productName||"A box"}" couldn't be placed. Try removing a product or picking a larger vehicle.`}
+                    ? "Yes — everything fits!"
+                    : result.fitsFolded
+                    ? "Fits with rear seats folded down"
+                    : result.fitsDisassembled
+                    ? "May fit if disassembled"
+                    : "Doesn't fit in the boot"}
                 </div>
+                <div style={{fontSize:14,lineHeight:1.6,
+                  color:result.fits?"#047857":result.fitsFolded?"#1D4ED8":result.fitsDisassembled?"#B45309":"#B91C1C"}}>
+                  {result.fits
+                    ? `All ${products.length} product(s) · ${arrRef.current.length} box${arrRef.current.length!==1?"es":""} total — fits in the ${make} ${model}.`
+                    : result.fitsFolded
+                    ? <>
+                        Doesn't fit with seats up, but <strong>fits when the rear seats are folded flat</strong>. The extended boot space gives {result.foldedCargo?.l} cm of depth.
+                      </>
+                    : result.fitsDisassembled
+                    ? result.disassemblyNote
+                    : `"${result.failedBox?.productName||"A box"}" couldn't be placed. Try a larger vehicle, or check if the item can be disassembled.`}
+                </div>
+                {result.fitsFolded&&(
+                  <div style={{marginTop:8,fontSize:12,color:"#3B82F6",background:"#DBEAFE",borderRadius:6,padding:"6px 10px",display:"inline-block"}}>
+                    ⚠️ Ensure your {make} {model} has fold-flat rear seats before loading
+                  </div>
+                )}
+                {result.fitsDisassembled&&(
+                  <div style={{marginTop:8,fontSize:12,color:"#92400E",background:"#FEF3C7",borderRadius:6,padding:"6px 10px"}}>
+                    💡 Check the product manual for disassembly instructions. Re-run the check with the individual component dimensions once disassembled.
+                  </div>
+                )}
               </div>
             </div>
           )}
