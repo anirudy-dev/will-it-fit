@@ -132,14 +132,14 @@ function renderView(canvas, cargo, arr, view, hlId) {
   }
 }
 
-/* ─── car boot 3d renderer ──────────────────────────────────────────────── */
-// Photorealistic interior view — looking straight into the open boot.
+/* ─── car trunk 3d renderer ──────────────────────────────────────────────── */
+// Photorealistic interior view — looking straight into the open trunk.
 // Coordinate system: cx = depth (0 = opening, cargo.l = back wall)
 //                    cy = width  (0 = left wall, cargo.w = right wall)
 //                    cz = height (0 = floor, cargo.h = ceiling)
-/* ─── car boot 3d renderer — Three.js WebGL ─────────────────────────────── */
+/* ─── car trunk 3d renderer — Three.js WebGL ─────────────────────────────── */
 // Builds a photorealistic 3D interior scene: PBR materials, real shadows,
-// ACES tone-mapping, strong directional daylight from the open boot.
+// ACES tone-mapping, strong directional daylight from the open trunk.
 // Scene is cached on the canvas element and rebuilt only when cargo/carType changes.
 
 function render3D(canvas, cargo, arr, hlId, carType = "SUV") {
@@ -191,7 +191,7 @@ function _buildScene(canvas, cargo, carType) {
   scene.background = new THREE.Color(0x14161B);
 
   // ── Camera ────────────────────────────────────────────────────────────────
-  // Positioned just outside the boot opening, slightly above the sill,
+  // Positioned just outside the trunk opening, slightly above the sill,
   // looking inward and slightly downward — matches the reference image angle.
   const camera = new THREE.PerspectiveCamera(62, W / H, 1, l * 10);
   camera.position.set(-w * 0.38, h * 0.38, w / 2);
@@ -292,7 +292,7 @@ function _buildScene(canvas, cargo, carType) {
   // Back wall (X = l) — slightly darker panel
   addBox(new THREE.BoxGeometry(T, h, w), matSeat, l + T/2, h/2, w/2);
 
-  // Chrome boot sill across the opening bottom
+  // Chrome trunk sill across the opening bottom
   addBox(new THREE.BoxGeometry(T * 4, 5, w + 10), matChrome, -T, 2.5, w/2);
 
   // ── Horizontal trim ribs on side walls ────────────────────────────────────
@@ -618,7 +618,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
       ...b, id:`${p.id}-${i}`, productId:p.id, productName:p.name, color:p.color, assembled:p.assembled||false,
     })));
 
-    // 1. Try normal boot
+    // 1. Try normal trunk
     const normal = packBoxes(boxes, cargo);
     if (normal.fits) {
       arrRef.current = normal.arrangement;
@@ -655,7 +655,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
         const dims = [b.l, b.w, b.h].sort((a,z)=>z-a); // largest first
         const bootDims = [cargo.l, cargo.w, cargo.h].sort((a,z)=>z-a);
         const bootFolded = [foldedCargo.l, foldedCargo.w, foldedCargo.h].sort((a,z)=>z-a);
-        // If longest dimension exceeds boot but volume could fit if broken into 2 pieces
+        // If longest dimension exceeds trunk but volume could fit if broken into 2 pieces
         if (dims[0] > bootDims[0] && dims[0] <= bootFolded[0] * 1.4) {
           fitsDisassembled = true;
           disassemblyNote = `"${ap.name}" is too large assembled. Disassembling it may allow it to fit${carType!=="Truck"?" — possibly with seats folded too":""}.`;
@@ -717,7 +717,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
           </svg>
         </div>
         <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
-        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Boot Space Checker</span>}
+        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Trunk Space Checker</span>}
       </nav>
 
       <div style={{maxWidth:1280,margin:"0 auto",padding:isMobile?"16px":"40px 24px",display:"grid",gridTemplateColumns:isMobile?"1fr":"minmax(0,1fr) minmax(0,1.4fr)",gap:isMobile?16:32,alignItems:"start"}}>
@@ -983,7 +983,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
               {cargo&&(
                 <div style={{background:"#EFF6FF",border:"1.5px solid #BFDBFE",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#1E40AF"}}>
                   <div style={{fontWeight:700,marginBottom:4}}>{make} {model} {year} · {carType}</div>
-                  <div style={{color:"#3B82F6"}}>Boot space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
+                  <div style={{color:"#3B82F6"}}>Trunk space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
                   <div style={{color:"#93C5FD",fontSize:11,marginTop:4}}>* Approximate. Rear seats may need to be folded.</div>
                 </div>
               )}
@@ -1017,7 +1017,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
                     ? "Fits with rear seats folded down"
                     : result.fitsDisassembled
                     ? "May fit if disassembled"
-                    : "Doesn't fit in the boot"}
+                    : "Doesn't fit in the trunk"}
                 </div>
                 <div style={{fontSize:14,lineHeight:1.6,
                   color:result.fits?"#047857":result.fitsFolded?"#1D4ED8":result.fitsDisassembled?"#B45309":"#B91C1C"}}>
@@ -1025,7 +1025,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
                     ? `All ${products.length} product(s) · ${arrRef.current.length} box${arrRef.current.length!==1?"es":""} total — fits in the ${make} ${model}.`
                     : result.fitsFolded
                     ? <>
-                        Doesn't fit with seats up, but <strong>fits when the rear seats are folded flat</strong>. The extended boot space gives {result.foldedCargo?.l} cm of depth.
+                        Doesn't fit with seats up, but <strong>fits when the rear seats are folded flat</strong>. The extended trunk space gives {result.foldedCargo?.l} cm of depth.
                       </>
                     : result.fitsDisassembled
                     ? result.disassemblyNote
@@ -1089,7 +1089,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
 
                 {(activeView==="both"||activeView==="3d")&&(
                   <div>
-                    <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>3D View — Boot Opening</div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#6B7280",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>3D View — Trunk Opening</div>
                     <canvas ref={threeRef} width={860} height={520} style={{width:"100%",display:"block",borderRadius:10,border:"1.5px solid #E5E7EB"}}/>
                   </div>
                 )}
