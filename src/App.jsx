@@ -1,5 +1,11 @@
 import * as THREE from "three";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+/* ─── Supabase client (disabled gracefully if env vars not set) ────────────── */
+const _url = import.meta.env?.VITE_SUPABASE_URL;
+const _key = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+const supabase = (_url && _key) ? createClient(_url, _key) : null;
 
 const _r3dCache = new WeakMap(); // Three.js scene cache keyed by canvas element
 
@@ -492,10 +498,95 @@ export default function App() {
   const [showConfetti,setShowConfetti] = useState(false);
   const [unit,setUnit]                 = useState("cm"); // "cm" | "in"
 
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const [user,setUser]                 = useState(null);
+  const [authLoading,setAuthLoading]   = useState(true);
+  const [showHistory,setShowHistory]   = useState(false);
+  const [history,setHistory]           = useState([]);
+
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 640;
 
   const topRef=useRef(null),sideRef=useRef(null),threeRef=useRef(null),arrRef=useRef([]),dragRef=useRef(null),resultRef=useRef(null);
+
+  // ── Auth effect: listen for login/logout ────────────────────────────────────
+  useEffect(() => {
+    if (!supabase) { setAuthLoading(false); return; }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+      if (session?.user) loadUserCar(session.user);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) loadUserCar(session.user);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Auth helpers ─────────────────────────────────────────────────────────
+  const handleLogin = async () => {
+    if (!supabase) return;
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+  };
+  const handleLogout = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setUser(null); setHistory([]); setShowHistory(false);
+  };
+
+  // ── Load/save user car ────────────────────────────────────────────────────
+  const loadUserCar = async (u) => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from("user_cars")
+      .select("make,model,year")
+      .eq("user_id", u.id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single();
+    if (data) { setMake(data.make); setModel(data.model); setYear(String(data.year)); }
+  };
+  const saveUserCar = async () => {
+    if (!supabase || !user || !make || !model || !year) return;
+    const { data: existing } = await supabase
+      .from("user_cars").select("id").eq("user_id", user.id).single();
+    if (existing) {
+      await supabase.from("user_cars")
+        .update({ make, model, year: +year, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("user_cars")
+        .insert({ user_id: user.id, make, model, year: +year });
+    }
+  };
+
+  // ── Save/load history ─────────────────────────────────────────────────────
+  const saveToHistory = async (fitResult) => {
+    if (!supabase || !user) return;
+    await supabase.from("user_history").insert({
+      user_id: user.id,
+      product_names: products.map(p => p.name).join(", "),
+      car_make: make, car_model: model, car_year: +year,
+      result: fitResult,
+    });
+  };
+  const loadHistory = async () => {
+    if (!supabase || !user) return;
+    const { data } = await supabase
+      .from("user_history")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(15);
+    setHistory(data || []);
+  };
+
+  // ── Community product DB — coming soon ───────────────────────────────────
+  // (feature deferred — will be added in a future release)
 
   const makes  = Object.keys(CARS).sort();
   const models = make ? Object.keys(CARS[make]).sort() : [];
@@ -660,6 +751,7 @@ If there are truly no dimensions visible, return:
       arrRef.current = normal.arrangement;
       setResult({ fits:true, fitsFolded:false, fitsDisassembled:false, arrangement:normal.arrangement });
       window.dataLayer.push({ event:"check_fit_result", fit_result:"fits", car_make:make, car_model:model });
+      saveUserCar(); saveToHistory("fits");
       setShowConfetti(false); setTimeout(()=>setShowConfetti(true), 30);
       scrollToResult();
       return;
@@ -672,6 +764,7 @@ If there are truly no dimensions visible, return:
       arrRef.current = folded.arrangement;
       setResult({ fits:false, fitsFolded:true, foldedCargo, arrangement:folded.arrangement, failedBox:normal.failedBox });
       window.dataLayer.push({ event:"check_fit_result", fit_result:"fits_folded", car_make:make, car_model:model });
+      saveUserCar(); saveToHistory("fits_folded");
       setShowConfetti(false); setTimeout(()=>setShowConfetti(true), 30);
       scrollToResult();
       return;
@@ -710,6 +803,7 @@ If there are truly no dimensions visible, return:
     arrRef.current = normal.arrangement;
     setResult({ fits:false, fitsFolded:false, fitsDisassembled, disassemblyNote, arrangement:normal.arrangement, failedBox:normal.failedBox });
     window.dataLayer.push({ event:"check_fit_result", fit_result: fitsDisassembled ? "fits_disassembled" : "no_fit", car_make:make, car_model:model });
+    saveUserCar(); saveToHistory(fitsDisassembled ? "fits_disassembled" : "no_fit");
     setShowConfetti(false);
     scrollToResult();
   };
@@ -770,6 +864,43 @@ If there are truly no dimensions visible, return:
         </div>
         <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
         {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Trunk Space Checker</span>}
+
+        {/* ── Auth button (right-aligned) ── */}
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+          {!authLoading && supabase && (
+            user ? (
+              <>
+                <button onClick={()=>{setShowHistory(true);loadHistory();}}
+                  style={{background:"#EFF6FF",color:"#2563EB",border:"1.5px solid #BFDBFE",borderRadius:8,
+                    padding:"5px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
+                  📋 {isMobile?"":"History"}
+                </button>
+                <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:8,
+                  background:"#F9FAFB",border:"1.5px solid #E5E7EB",cursor:"pointer"}}
+                  onClick={handleLogout} title="Sign out">
+                  {user.user_metadata?.avatar_url
+                    ? <img src={user.user_metadata.avatar_url} alt="" style={{width:22,height:22,borderRadius:"50%"}}/>
+                    : <div style={{width:22,height:22,borderRadius:"50%",background:"#1E3A5F",color:"#fff",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        {(user.user_metadata?.name||user.email||"?")[0].toUpperCase()}
+                      </div>
+                  }
+                  {!isMobile&&<span style={{fontSize:12,color:"#374151",fontWeight:500,maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {user.user_metadata?.name || user.email?.split("@")[0]}
+                  </span>}
+                  <span style={{fontSize:10,color:"#9CA3AF"}}>✕</span>
+                </div>
+              </>
+            ) : (
+              <button onClick={handleLogin}
+                style={{background:"#fff",color:"#374151",border:"1.5px solid #E5E7EB",borderRadius:8,
+                  padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+                  display:"flex",alignItems:"center",gap:6}}>
+                <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                {isMobile ? "Sign in" : "Sign in with Google"}
+              </button>
+            )
+          )}
+        </div>
       </nav>
 
       {/* ── Page wrapper ── */}
@@ -1191,9 +1322,66 @@ If there are truly no dimensions visible, return:
         </div>
       </div>
 
+      {/* ── History slide-in panel ── */}
+      {showHistory&&(
+        <>
+          {/* Backdrop */}
+          <div onClick={()=>setShowHistory(false)}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:200,backdropFilter:"blur(2px)"}}/>
+          {/* Panel */}
+          <div style={{position:"fixed",top:0,right:0,bottom:0,width:isMobile?"100vw":420,
+            background:"#fff",zIndex:201,boxShadow:"-4px 0 24px rgba(0,0,0,0.12)",
+            display:"flex",flexDirection:"column",animation:"slideIn 0.22s ease"}}>
+            {/* Header */}
+            <div style={{padding:"18px 20px",borderBottom:"1px solid #E5E7EB",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:16,color:"#111827"}}>My Check History</div>
+                <div style={{fontSize:12,color:"#9CA3AF",marginTop:2}}>Last 15 checks — saved to your account</div>
+              </div>
+              <button onClick={()=>setShowHistory(false)}
+                style={{background:"none",border:"none",fontSize:20,color:"#9CA3AF",cursor:"pointer",padding:"4px 6px",fontFamily:"inherit",lineHeight:1}}>✕</button>
+            </div>
+            {/* Body */}
+            <div style={{flex:1,overflowY:"auto",padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+              {history.length===0&&(
+                <div style={{textAlign:"center",padding:"40px 20px",color:"#9CA3AF",fontSize:14}}>
+                  No checks yet — run your first fit check to see history here.
+                </div>
+              )}
+              {history.map((h,i)=>{
+                const resultMeta = {
+                  fits:           { bg:"#ECFDF5", border:"#6EE7B7", color:"#065F46", icon:"🎉", label:"Fits" },
+                  fits_folded:    { bg:"#EFF6FF", border:"#93C5FD", color:"#1E40AF", icon:"🚗", label:"Fits (seats folded)" },
+                  fits_disassembled:{ bg:"#FFFBEB", border:"#FDE68A", color:"#92400E", icon:"🔧", label:"Try disassembling" },
+                  no_fit:         { bg:"#FEF2F2", border:"#FCA5A5", color:"#991B1B", icon:"📦", label:"Doesn't fit" },
+                }[h.result] || { bg:"#F3F4F6", border:"#E5E7EB", color:"#6B7280", icon:"❓", label:h.result };
+                const date = new Date(h.created_at);
+                const dateStr = date.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+                return (
+                  <div key={h.id||i} style={{borderRadius:10,border:`1.5px solid ${resultMeta.border}`,
+                    background:resultMeta.bg,padding:"12px 14px"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:16}}>{resultMeta.icon}</span>
+                        <span style={{fontSize:12,fontWeight:700,color:resultMeta.color}}>{resultMeta.label}</span>
+                      </div>
+                      <span style={{fontSize:11,color:"#9CA3AF"}}>{dateStr}</span>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:600,color:"#111827",marginBottom:2,
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.product_names||"—"}</div>
+                    <div style={{fontSize:12,color:"#6B7280"}}>{h.car_make} {h.car_model} {h.car_year}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideDown { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes slideIn { from{opacity:0;transform:translateX(32px)} to{opacity:1;transform:translateX(0)} }
         * { box-sizing: border-box; }
         button, a { touch-action: manipulation; }
         input, select, textarea { font-size: 16px !important; }
