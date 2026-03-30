@@ -21,6 +21,14 @@ const BOX_COLORS = [
   "#EC4899","#06B6D4","#F97316","#84CC16","#6366F1",
 ];
 
+/* ─── unit helpers ────────────────────────────────────────────────────────── */
+const toIn   = cm  => Math.round(cm / 2.54 * 10) / 10;          // cm → inches (1dp)
+const toCm   = (val, unit) => unit === "in"                      // user input → cm
+  ? Math.round(+val * 2.54)
+  : Math.round(+val);
+const fmtDim = (cm, unit) => unit === "in" ? toIn(cm) : cm;     // cm value → display value
+const unitLbl = unit => unit === "in" ? "in" : "cm";
+
 /* ─── car database ────────────────────────────────────────────────────────── */
 const CARS = {
   Acura:{ ILX:{y:[2013,2022],cargo:{l:88,w:120,h:36},type:"Sedan"},MDX:{y:[2007,2024],cargo:{l:108,w:118,h:83},type:"SUV"},RDX:{y:[2007,2024],cargo:{l:100,w:108,h:75},type:"SUV"},TLX:{y:[2021,2024],cargo:{l:95,w:130,h:38},type:"Sedan"} },
@@ -87,7 +95,7 @@ function packBoxes(inputBoxes, cargo) {
 }
 
 /* ─── canvas renderer ─────────────────────────────────────────────────────── */
-function renderView(canvas, cargo, arr, view, hlId) {
+function renderView(canvas, cargo, arr, view, hlId, unit="cm") {
   if (!canvas||!cargo) return;
   const ctx=canvas.getContext("2d"), W=canvas.width, H=canvas.height;
   const [dX,dY]=view==="top"?[cargo.l,cargo.w]:[cargo.w,cargo.h];
@@ -101,8 +109,8 @@ function renderView(canvas, cargo, arr, view, hlId) {
   ctx.strokeStyle="#3B82F6"; ctx.lineWidth=2; ctx.setLineDash([8,4]);
   ctx.strokeRect(ox,oy,dX*sc,dY*sc); ctx.setLineDash([]);
   ctx.fillStyle="#6B7280"; ctx.font="bold 12px system-ui,sans-serif"; ctx.textAlign="center";
-  ctx.fillText(`${dX} cm`,ox+dX*sc/2,oy-14);
-  ctx.save(); ctx.translate(ox-18,oy+dY*sc/2); ctx.rotate(-Math.PI/2); ctx.fillText(`${dY} cm`,0,0); ctx.restore();
+  ctx.fillText(`${fmtDim(dX,unit)} ${unitLbl(unit)}`,ox+dX*sc/2,oy-14);
+  ctx.save(); ctx.translate(ox-18,oy+dY*sc/2); ctx.rotate(-Math.PI/2); ctx.fillText(`${fmtDim(dY,unit)} ${unitLbl(unit)}`,0,0); ctx.restore();
   const lbl=view==="top"?"TOP VIEW":"SIDE VIEW";
   ctx.font="bold 11px system-ui,sans-serif"; ctx.textAlign="left";
   const tw=ctx.measureText(lbl).width;
@@ -126,7 +134,7 @@ function renderView(canvas, cargo, arr, view, hlId) {
       ctx.fillText(name,bx+bw/2,by+bh/2+(view==="top"&&bh>34?-5:fs/3));
       if(bh>34&&view==="top"){
         ctx.font=`${fs-2}px system-ui,sans-serif`; ctx.fillStyle=b.color+"99";
-        ctx.fillText(`${b.rl}×${b.rw}×${b.rh}cm`,bx+bw/2,by+bh/2+fs*1.1);
+        ctx.fillText(`${fmtDim(b.rl,unit)}×${fmtDim(b.rw,unit)}×${fmtDim(b.rh,unit)}${unitLbl(unit)}`,bx+bw/2,by+bh/2+fs*1.1);
       }
     }
   }
@@ -142,7 +150,7 @@ function renderView(canvas, cargo, arr, view, hlId) {
 // ACES tone-mapping, strong directional daylight from the open trunk.
 // Scene is cached on the canvas element and rebuilt only when cargo/carType changes.
 
-function render3D(canvas, cargo, arr, hlId, carType = "SUV") {
+function render3D(canvas, cargo, arr, hlId, carType = "SUV", unit = "cm") {
   if (!canvas || !cargo || typeof THREE === "undefined") return;
 
   const cacheKey = `${cargo.l}|${cargo.w}|${cargo.h}|${carType}`;
@@ -165,7 +173,7 @@ function render3D(canvas, cargo, arr, hlId, carType = "SUV") {
     _r3dCache.set(canvas, st);
   }
 
-  _updateBoxes(st.boxGroup, arr, hlId);
+  _updateBoxes(st.boxGroup, arr, hlId, unit);
   st.renderer.render(st.scene, st.camera);
 }
 
@@ -342,7 +350,7 @@ function _buildScene(canvas, cargo, carType) {
   return { renderer, scene, camera, boxGroup };
 }
 
-function _updateBoxes(boxGroup, arr, hlId) {
+function _updateBoxes(boxGroup, arr, hlId, unit = "cm") {
   // Dispose old meshes
   while (boxGroup.children.length > 0) {
     const ch = boxGroup.children[0];
@@ -383,7 +391,7 @@ function _updateBoxes(boxGroup, arr, hlId) {
     }
 
     // Label sprite
-    const labelTex = _makeLabel(b.productName || "", color, `${rl}×${rw}×${rh}`);
+    const labelTex = _makeLabel(b.productName || "", color, `${fmtDim(rl,unit)}×${fmtDim(rw,unit)}×${fmtDim(rh,unit)}`, unit);
     const spriteMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true, depthTest: false });
     const sprite    = new THREE.Sprite(spriteMat);
     sprite.position.set(x + rl/2, z + rh + 4, y + rw/2);
@@ -394,7 +402,7 @@ function _updateBoxes(boxGroup, arr, hlId) {
   });
 }
 
-function _makeLabel(name, color, dims) {
+function _makeLabel(name, color, dims, unit = "cm") {
   const W = 512, H = 128;
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
@@ -417,7 +425,7 @@ function _makeLabel(name, color, dims) {
   // Dimensions
   ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.font = "32px system-ui,sans-serif";
-  ctx.fillText(dims + " cm", 30, H * 0.75);
+  ctx.fillText(dims + " " + unit, 30, H * 0.75);
 
   return new THREE.CanvasTexture(c);
 }
@@ -479,6 +487,7 @@ export default function App() {
   const [dragging,setDragging]         = useState(null);
   const [activeView,setActiveView]     = useState("both");
   const [showConfetti,setShowConfetti] = useState(false);
+  const [unit,setUnit]                 = useState("cm"); // "cm" | "in"
 
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 640;
@@ -501,7 +510,7 @@ export default function App() {
     if (!name.trim()) { setAssembledError("Please enter a product name."); return; }
     if (!l||!w||!h||isNaN(+l)||isNaN(+w)||isNaN(+h)||+l<=0||+w<=0||+h<=0) { setAssembledError("All dimensions must be positive numbers."); return; }
     const color = BOX_COLORS[products.length % BOX_COLORS.length];
-    setProducts(prev=>[...prev,{id:Date.now(),name:name.trim(),boxes:[{l:+l,w:+w,h:+h}],color,assembled:true}]);
+    setProducts(prev=>[...prev,{id:Date.now(),name:name.trim(),boxes:[{l:toCm(l,unit),w:toCm(w,unit),h:toCm(h,unit)}],color,assembled:true}]);
     setAssembledForm({name:"",l:"",w:"",h:""});
     setResult(null);
   };
@@ -579,10 +588,14 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
       if (json.error) throw new Error(json.error);
       if (!json.boxes?.length) throw new Error("No packaging dimensions found in this screenshot");
 
-      // Auto-fill the form
+      // Auto-fill the form — convert to current unit for display
       setForm({
         name: json.name || "",
-        packages: json.boxes.map(b => ({ l: String(b.l), w: String(b.w), h: String(b.h) })),
+        packages: json.boxes.map(b => ({
+          l: unit === "in" ? String(toIn(b.l)) : String(b.l),
+          w: unit === "in" ? String(toIn(b.w)) : String(b.w),
+          h: unit === "in" ? String(toIn(b.h)) : String(b.h),
+        })),
       });
       setScanError("");
     } catch (err) {
@@ -604,7 +617,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
       if(!l||!w||!h||isNaN(+l)||isNaN(+w)||isNaN(+h)||+l<=0||+w<=0||+h<=0){setFormError(`Package ${i+1}: all dimensions must be positive numbers.`);return;}
     }
     const color=BOX_COLORS[products.length%BOX_COLORS.length];
-    setProducts(prev=>[...prev,{id:Date.now(),name:form.name.trim(),boxes:form.packages.map(p=>({l:+p.l,w:+p.w,h:+p.h})),color}]);
+    setProducts(prev=>[...prev,{id:Date.now(),name:form.name.trim(),boxes:form.packages.map(p=>({l:toCm(p.l,unit),w:toCm(p.w,unit),h:toCm(p.h,unit)})),color}]);
     setForm(emptyForm()); setResult(null);
   };
 
@@ -688,10 +701,10 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
 
   const redraw=useCallback((hl=hlId)=>{
     if(!result||!cargo) return;
-    renderView(topRef.current,cargo,arrRef.current,"top",hl);
-    renderView(sideRef.current,cargo,arrRef.current,"side",hl);
-    render3D(threeRef.current,cargo,arrRef.current,hl,carType);
-  },[result,cargo,hlId,carType]);
+    renderView(topRef.current,cargo,arrRef.current,"top",hl,unit);
+    renderView(sideRef.current,cargo,arrRef.current,"side",hl,unit);
+    render3D(threeRef.current,cargo,arrRef.current,hl,carType,unit);
+  },[result,cargo,hlId,carType,unit]);
 
   // Redraw when result changes
   useEffect(()=>{redraw();},[redraw]);
@@ -702,7 +715,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
     if(!result||!cargo) return;
     const t = setTimeout(()=>redraw(), 0);
     return ()=>clearTimeout(t);
-  },[activeView,result,cargo]);
+  },[activeView,result,cargo,unit]);
 
   const getXY=(e,canvas)=>{
     const r=canvas.getBoundingClientRect(),sw=canvas.width/r.width,sh=canvas.height/r.height;
@@ -792,7 +805,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
                     value={assembledForm.name}
                     onChange={e=>setAssembledForm(f=>({...f,name:e.target.value}))}/>
                 </div>
-                <Label>Assembled Dimensions (cm)</Label>
+                <Label>Assembled Dimensions ({unitLbl(unit)})</Label>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:isMobile?6:8,marginBottom:8}}>
                   {[["l","LENGTH"],["w","WIDTH"],["h","HEIGHT"]].map(([field,lbl])=>(
                     <div key={field}>
@@ -902,8 +915,19 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
                 onKeyDown={e=>e.key==="Enter"&&canAdd&&addProduct()}/>
             </div>
 
-            <div style={{marginBottom:8}}>
-              <Label>Box Dimensions (cm) — find these on the product page under "Packaging"</Label>
+            <div style={{marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+              <Label>Box Dimensions — find these on the product page under "Packaging"</Label>
+              <div style={{display:"flex",flexShrink:0,border:"1.5px solid #E5E7EB",borderRadius:8,overflow:"hidden"}}>
+                {["cm","in"].map(u=>(
+                  <button key={u} onClick={()=>setUnit(u)}
+                    style={{padding:"4px 12px",fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:"inherit",
+                      background:unit===u?"#1E3A5F":"#fff",
+                      color:unit===u?"#fff":"#9CA3AF",
+                      transition:"all 0.15s"}}>
+                    {u}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {form.packages.map((pkg,i)=>(
@@ -962,7 +986,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
                       <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
                         {p.boxes.map((b,i)=>(
                           <span key={i} style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:99,background:p.color+"18",color:p.color,border:`1px solid ${p.color}44`,letterSpacing:"0.03em"}}>
-                            {b.l}×{b.w}×{b.h} cm
+                          {fmtDim(b.l,unit)}×{fmtDim(b.w,unit)}×{fmtDim(b.h,unit)} {unitLbl(unit)}
                           </span>
                         ))}
                       </div>
@@ -1007,7 +1031,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
               {cargo&&(
                 <div style={{background:"#EFF6FF",border:"1.5px solid #BFDBFE",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#1E40AF"}}>
                   <div style={{fontWeight:700,marginBottom:4}}>{make} {model} {year} · {carType}</div>
-                  <div style={{color:"#3B82F6"}}>Trunk space: {cargo.l} × {cargo.w} × {cargo.h} cm &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
+                  <div style={{color:"#3B82F6"}}>Trunk space: {fmtDim(cargo.l,unit)} × {fmtDim(cargo.w,unit)} × {fmtDim(cargo.h,unit)} {unitLbl(unit)} &nbsp;≈&nbsp; {Math.round(cargo.l*cargo.w*cargo.h/1000)} L</div>
                   <div style={{color:"#93C5FD",fontSize:11,marginTop:4}}>* Approximate. Rear seats may need to be folded.</div>
                 </div>
               )}
@@ -1049,7 +1073,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
                     ? `All ${products.length} product(s) · ${arrRef.current.length} box${arrRef.current.length!==1?"es":""} total — fits in the ${make} ${model}.`
                     : result.fitsFolded
                     ? <>
-                        Doesn't fit with seats up, but <strong>fits when the rear seats are folded flat</strong>. The extended trunk space gives {result.foldedCargo?.l} cm of depth.
+                        Doesn't fit with seats up, but <strong>fits when the rear seats are folded flat</strong>. The extended trunk space gives {fmtDim(result.foldedCargo?.l,unit)} {unitLbl(unit)} of depth.
                       </>
                     : result.fitsDisassembled
                     ? result.disassemblyNote
@@ -1134,7 +1158,7 @@ If there are truly no dimensions of any kind visible in the screenshot, return:
                     {arrRef.current.map((b,i)=>(
                       <div key={i} style={{borderLeft:`3px solid ${b.color}`,paddingLeft:10}}>
                         <div style={{fontSize:13,fontWeight:600,color:"#111827",marginBottom:2}}>{b.productName?.substring(0,22)}</div>
-                        <div style={{fontSize:12,color:"#6B7280"}}>{b.rl}×{b.rw}×{b.rh} cm</div>
+                        <div style={{fontSize:12,color:"#6B7280"}}>{fmtDim(b.rl,unit)}×{fmtDim(b.rw,unit)}×{fmtDim(b.rh,unit)} {unitLbl(unit)}</div>
                         <div style={{fontSize:11,color:"#9CA3AF"}}>x{Math.round(b.x)} y{Math.round(b.y)} z{Math.round(b.z)}</div>
                       </div>
                     ))}
