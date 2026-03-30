@@ -548,31 +548,38 @@ export default function App() {
                 type: "text",
                 text: `You are extracting packaging box dimensions from a product page screenshot.
 
-Look at the screenshot and find any dimensions that describe the SHIPPING BOX or PACKAGE — these are the physical measurements of the box the product arrives in.
+Look at the screenshot and find any dimensions that describe the SHIPPING BOX or PACKAGE — the physical measurements of the box the product arrives in.
 
-Common labels to look for (any of these count):
+Common labels to look for:
 - Width / Height / Length / Depth (when shown alongside "Package(s)" count or weight)
 - "Package dimensions", "Box dimensions", "Shipping dimensions"
-- "Package 1", "Package 2" etc (multiple boxes)
+- "Package 1", "Package 2" etc (multiple box types)
 - Any table or list of dimensions near a "Package(s):" or "Weight:" field
 
-IMPORTANT: If you see Width, Height, Length values alongside a "Package(s):" count and/or a weight in kg/lb — those ARE the packaging dimensions. Extract them.
+CRITICAL RULE — Package(s) count is a QUANTITY MULTIPLIER:
+When you see a "Package(s): N" field next to a set of dimensions, you MUST include exactly N copies of that box in the boxes array. Do NOT include just 1 entry — include N entries with identical dimensions.
 
-Map the values as follows:
+Example: A product page shows:
+  Frame — Width: 52cm, Height: 5cm, Length: 69cm, Package(s): 1
+  Wire basket — Width: 21cm, Height: 14cm, Length: 50cm, Package(s): 4
+Correct output: 5 box entries — 1 copy of the Frame box, then 4 copies of the Wire basket box.
+Wrong output: 2 box entries (one per component) — this IGNORES the Package(s) count.
+
+If a "This product comes as X packages" summary is visible, the total number of entries in your boxes array MUST equal X.
+
+Dimension mapping:
 - l = Length (the longest dimension)
 - w = Width
 - h = Height
 - Convert inches to centimetres (× 2.54, round to nearest integer)
 - Round all values to the nearest integer
 
-If there are multiple packages (Package 1, Package 2 etc) include each as a separate object in the boxes array.
-
-Also extract the product name if visible on the page. If no product name is visible, use an empty string.
+Also extract the product name if visible. If not visible, use an empty string.
 
 Return ONLY valid JSON, no markdown, no explanation:
-{"name":"Product Name","boxes":[{"l":86,"w":37,"h":21}]}
+{"name":"Product Name","boxes":[{"l":86,"w":37,"h":21},{"l":86,"w":37,"h":21}]}
 
-If there are truly no dimensions of any kind visible in the screenshot, return:
+If there are truly no dimensions visible, return:
 {"error":"No dimensions visible in screenshot"}`,
               },
             ],
