@@ -503,6 +503,10 @@ export default function App() {
   const [authLoading,setAuthLoading]   = useState(true);
   const [showHistory,setShowHistory]   = useState(false);
   const [history,setHistory]           = useState([]);
+  const [showCarsPanel,setShowCarsPanel] = useState(false);
+  const [savedCars,setSavedCars]       = useState([]);
+  const [saveCarChecked,setSaveCarChecked] = useState(false);
+  const [carNickname,setCarNickname]   = useState("");
 
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 640;
@@ -515,11 +519,11 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
-      if (session?.user) loadUserCar(session.user);
+      if (session?.user) loadUserCars(session.user);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) loadUserCar(session.user);
+      if (session?.user) loadUserCars(session.user);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -539,28 +543,83 @@ export default function App() {
   };
 
   // ── Load/save user car ────────────────────────────────────────────────────
-  const loadUserCar = async (u) => {
+  // ── Load all user's saved cars and pre-fill with most recent ─────────────
+  const loadUserCars = async (u) => {
     if (!supabase) return;
     const { data } = await supabase
       .from("user_cars")
-      .select("make,model,year")
+      .select("id,make,model,year,nickname,updated_at")
       .eq("user_id", u.id)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .single();
-    if (data) { setMake(data.make); setModel(data.model); setYear(String(data.year)); }
+      .order("updated_at", { ascending: false });
+    if (data?.length) {
+      setSavedCars(data);
+      // Auto-fill the dropdowns with the most recently used car
+      const latest = data[0];
+      setMake(latest.make); setModel(latest.model); setYear(String(latest.year));
+    }
   };
+
+  // ── Save current car to garage (always a new entry unless nickname exists) ─
+  const saveCarToGarage = async () => {
+    if (!supabase || !user || !make || !model || !year) return;
+    const nickname = carNickname.trim() || `${make} ${model}`;
+    // Check if an identical car+nickname combo already exists to avoid duplicates
+    const { data: existing } = await supabase
+      .from("user_cars")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("make", make)
+      .eq("model", model)
+      .eq("year", +year)
+      .eq("nickname", nickname)
+      .single();
+    if (!existing) {
+      await supabase.from("user_cars")
+        .insert({ user_id: user.id, make, model, year: +year, nickname });
+    } else {
+      // Update the timestamp so it floats to the top as most recently used
+      await supabase.from("user_cars")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+    }
+    // Refresh the garage list
+    await loadUserCars(user);
+    setSaveCarChecked(false);
+    setCarNickname("");
+  };
+
+  // ── Load a saved car into the dropdowns ───────────────────────────────────
+  const selectSavedCar = (car) => {
+    setMake(car.make); setModel(car.model); setYear(String(car.year));
+    setResult(null); setShowCarsPanel(false);
+    // Mark as most recently used
+    if (supabase && user) {
+      supabase.from("user_cars")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", car.id);
+    }
+  };
+
+  // ── Delete a car from the garage ──────────────────────────────────────────
+  const deleteSavedCar = async (carId) => {
+    if (!supabase || !user) return;
+    await supabase.from("user_cars").delete().eq("id", carId);
+    setSavedCars(prev => prev.filter(c => c.id !== carId));
+  };
+
+  // ── Legacy wrapper used at checkFit time (silently updates timestamp) ──────
   const saveUserCar = async () => {
     if (!supabase || !user || !make || !model || !year) return;
-    const { data: existing } = await supabase
-      .from("user_cars").select("id").eq("user_id", user.id).single();
-    if (existing) {
-      await supabase.from("user_cars")
-        .update({ make, model, year: +year, updated_at: new Date().toISOString() })
-        .eq("id", existing.id);
+    if (saveCarChecked) {
+      await saveCarToGarage();
     } else {
-      await supabase.from("user_cars")
-        .insert({ user_id: user.id, make, model, year: +year });
+      // Just update the timestamp on the matching car so it stays as default
+      const match = savedCars.find(c => c.make===make && c.model===model && String(c.year)===String(year));
+      if (match) {
+        await supabase.from("user_cars")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", match.id);
+      }
     }
   };
 
@@ -875,6 +934,11 @@ If there are truly no dimensions visible, return:
                     padding:"5px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
                   📋 {isMobile?"":"History"}
                 </button>
+                <button onClick={()=>{setShowCarsPanel(true);loadUserCars(user);}}
+                  style={{background:"#F0FDF4",color:"#15803D",border:"1.5px solid #BBF7D0",borderRadius:8,
+                    padding:"5px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
+                  🚗 {isMobile?"":"My Cars"}
+                </button>
                 <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:8,
                   background:"#F9FAFB",border:"1.5px solid #E5E7EB",cursor:"pointer"}}
                   onClick={handleLogout} title="Sign out">
@@ -1159,9 +1223,34 @@ If there are truly no dimensions visible, return:
               <StepBadge n={2}/>
               <span style={{fontWeight:700,fontSize:16}}>Your Car</span>
             </div>
+
+            {/* ── Saved cars quick-select (logged in + has saved cars) ── */}
+            {user && savedCars.length > 0 && (
+              <div style={{marginBottom:16}}>
+                <Label>Your Garage</Label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                  {savedCars.map(car=>{
+                    const isActive = car.make===make && car.model===model && String(car.year)===String(year);
+                    return (
+                      <button key={car.id} onClick={()=>selectSavedCar(car)}
+                        style={{padding:"7px 12px",borderRadius:8,border:`1.5px solid ${isActive?"#1E3A5F":"#E5E7EB"}`,
+                          background:isActive?"#1E3A5F":"#F9FAFB",color:isActive?"#fff":"#374151",
+                          fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+                          transition:"all 0.15s",textAlign:"left"}}>
+                        <div style={{fontWeight:700}}>{car.nickname||`${car.make} ${car.model}`}</div>
+                        <div style={{fontSize:10,opacity:0.75,marginTop:1}}>
+                          {car.make} {car.model} · {car.year}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div>
-                <Label>Make</Label>
+                <Label>{user && savedCars.length > 0 ? "Or select a different car" : "Make"}</Label>
                 <SelectInput value={make} onChange={e=>{setMake(e.target.value);setModel("");setYear("");setResult(null);}}>
                   <option value="">Select Make</option>
                   {makes.map(m=><option key={m} value={m}>{m}</option>)}
@@ -1183,6 +1272,31 @@ If there are truly no dimensions visible, return:
                   </SelectInput>
                 </div>
               </div>
+
+              {/* ── Save to garage checkbox + nickname ── */}
+              {user && make && model && year && (
+                <div>
+                  <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none"}}>
+                    <input type="checkbox" checked={saveCarChecked}
+                      onChange={e=>setSaveCarChecked(e.target.checked)}
+                      style={{width:15,height:15,accentColor:"#1E3A5F",cursor:"pointer"}}/>
+                    <span style={{fontSize:13,color:"#374151",fontWeight:500}}>Save this car to my garage</span>
+                  </label>
+                  {saveCarChecked&&(
+                    <div style={{marginTop:8}}>
+                      <Input
+                        placeholder={`Nickname (e.g. "My Rogue", "Wife's SUV")`}
+                        value={carNickname}
+                        onChange={e=>setCarNickname(e.target.value)}
+                        style={{fontSize:13}}/>
+                      <div style={{fontSize:11,color:"#9CA3AF",marginTop:4}}>
+                        Give it a nickname so you can tell your cars apart. Defaults to "{make} {model}" if left blank.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {cargo&&(
                 <div style={{background:"#EFF6FF",border:"1.5px solid #BFDBFE",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#1E40AF"}}>
                   <div style={{fontWeight:700,marginBottom:4}}>{make} {model} {year} · {carType}</div>
@@ -1324,6 +1438,99 @@ If there are truly no dimensions visible, return:
           </div>
         </div>
       </div>
+
+      {/* ── My Cars (Garage) slide-in panel ── */}
+      {showCarsPanel&&(
+        <>
+          <div onClick={()=>setShowCarsPanel(false)}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:200,backdropFilter:"blur(2px)"}}/>
+          <div style={{position:"fixed",top:0,right:0,bottom:0,width:isMobile?"100vw":420,
+            background:"#fff",zIndex:201,boxShadow:"-4px 0 24px rgba(0,0,0,0.12)",
+            display:"flex",flexDirection:"column",animation:"slideIn 0.22s ease"}}>
+            {/* Header */}
+            <div style={{padding:"18px 20px",borderBottom:"1px solid #E5E7EB",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:16,color:"#111827"}}>My Garage</div>
+                <div style={{fontSize:12,color:"#9CA3AF",marginTop:2}}>Your saved cars — click one to load it</div>
+              </div>
+              <button onClick={()=>setShowCarsPanel(false)}
+                style={{background:"none",border:"none",fontSize:20,color:"#9CA3AF",cursor:"pointer",padding:"4px 6px",fontFamily:"inherit",lineHeight:1}}>✕</button>
+            </div>
+            {/* Body */}
+            <div style={{flex:1,overflowY:"auto",padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+              {savedCars.length===0&&(
+                <div style={{textAlign:"center",padding:"40px 20px",color:"#9CA3AF",fontSize:14,lineHeight:1.6}}>
+                  No cars saved yet.<br/>Select a car and check the "Save this car to my garage" box when running a check.
+                </div>
+              )}
+              {savedCars.map(car=>{
+                const isActive = car.make===make && car.model===model && String(car.year)===String(year);
+                return (
+                  <div key={car.id}
+                    style={{borderRadius:10,border:`1.5px solid ${isActive?"#1E3A5F":"#E5E7EB"}`,
+                      background:isActive?"#F0F4FF":"#F9FAFB",padding:"14px 16px",
+                      display:"flex",alignItems:"center",gap:12,cursor:"pointer",transition:"all 0.15s"}}
+                    onClick={()=>selectSavedCar(car)}>
+                    {/* Car icon */}
+                    <div style={{width:40,height:40,borderRadius:10,
+                      background:isActive?"#1E3A5F":"#E5E7EB",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                      🚗
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:14,color:isActive?"#1E3A5F":"#111827",
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {car.nickname || `${car.make} ${car.model}`}
+                      </div>
+                      <div style={{fontSize:12,color:"#6B7280",marginTop:2}}>
+                        {car.make} {car.model} · {car.year}
+                        {car.make&&CARS[car.make]?.[car.model]?
+                          ` · ${CARS[car.make][car.model].type}`:""
+                        }
+                      </div>
+                      {isActive&&(
+                        <div style={{fontSize:10,color:"#1E3A5F",fontWeight:700,marginTop:3,
+                          letterSpacing:"0.05em",textTransform:"uppercase"}}>
+                          Currently selected
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={e=>{e.stopPropagation();deleteSavedCar(car.id);}}
+                      title="Remove from garage"
+                      style={{background:"none",border:"1px solid #FCA5A5",borderRadius:6,
+                        color:"#EF4444",cursor:"pointer",fontSize:12,padding:"4px 8px",
+                        fontFamily:"inherit",flexShrink:0,lineHeight:1}}>
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Footer — add current car shortcut */}
+            {make&&model&&year&&(
+              <div style={{padding:"14px 16px",borderTop:"1px solid #E5E7EB",background:"#F9FAFB"}}>
+                <div style={{fontSize:12,color:"#6B7280",marginBottom:8}}>
+                  Current: <strong>{make} {model} {year}</strong>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <Input
+                    placeholder={`Nickname (e.g. "My Rogue")`}
+                    value={carNickname}
+                    onChange={e=>setCarNickname(e.target.value)}
+                    style={{fontSize:13,flex:1}}/>
+                  <button onClick={async()=>{await saveCarToGarage();setShowCarsPanel(false);}}
+                    style={{background:"#1E3A5F",color:"#fff",border:"none",borderRadius:8,
+                      padding:"10px 14px",fontSize:13,fontWeight:600,cursor:"pointer",
+                      fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>
+                    + Save
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── History slide-in panel ── */}
       {showHistory&&(
