@@ -1,3 +1,4 @@
+import ExtensionBanner from "./ExtensionBanner";
 import * as THREE from "three";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -969,6 +970,7 @@ If there are truly no dimensions visible, return:
           )}
         </div>
       </nav>
+      <ExtensionBanner />
 
       {/* ── Page wrapper ── */}
       <div style={{maxWidth:1280,margin:"0 auto",padding:isMobile?"16px":"40px 24px 24px",display:"flex",flexDirection:"column",gap:isMobile?16:24}}>
