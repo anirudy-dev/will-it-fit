@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Privacy Policy — Will it Fit?</title>
+  <meta name="description" content="Privacy policy for Will it Fit? — Boot Space Checker web app and Chrome extension."/>
+  <style>
+    :root {
+      --navy:   #1E3A5F;
+      --blue:   #3B82F6;
+      --light:  #EFF6FF;
+      --border: #E5E7EB;
+      --text:   #111827;
+      --muted:  #6B7280;
+      --bg:     #F9FAFB;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ── Nav ─────────────────────────────────────────────────────────── */
+    nav {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      height: 56px;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-logo {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--navy);
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .nav-brand { font-weight: 700; font-size: 16px; color: var(--text); text-decoration: none; }
+    .nav-brand span { color: var(--blue); }
+    .nav-sep { color: var(--border); margin: 0 4px; }
+    .nav-page { font-size: 14px; color: var(--muted); }
+    .nav-back {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 600;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .nav-back:hover { text-decoration: underline; }
+
+    /* ── Hero ─────────────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, #2B5C9C 100%);
+      color: #fff;
+      padding: 56px 24px 48px;
+      text-align: center;
+    }
+    .hero h1 { font-size: 32px; font-weight: 800; margin-bottom: 10px; }
+    .hero p  { font-size: 15px; opacity: 0.75; max-width: 460px; margin: 0 auto; }
+    .hero-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 20px;
+      font-size: 12px;
+      opacity: 0.65;
+    }
+    .hero-meta span { display: flex; align-items: center; gap: 5px; }
+
+    /* ── Layout ───────────────────────────────────────────────────────── */
+    .layout {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+    @media (max-width: 680px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    /* ── Sidebar TOC ──────────────────────────────────────────────────── */
+    .sidebar {
+      position: sticky;
+      top: 72px;
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .sidebar a {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 4px 0;
+      border-left: 2px solid transparent;
+      padding-left: 8px;
+      transition: color .15s, border-color .15s;
+    }
+    .sidebar a:hover { color: var(--blue); border-left-color: var(--blue); }
+
+    /* ── Content ──────────────────────────────────────────────────────── */
+    .content section {
+      margin-bottom: 40px;
+      scroll-margin-top: 80px;
+    }
+    .content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--light);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .content h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 20px 0 8px;
+    }
+    .content p  { color: #374151; margin-bottom: 12px; }
+    .content ul { padding-left: 20px; margin-bottom: 12px; }
+    .content li { color: #374151; margin-bottom: 6px; }
+    .content a  { color: var(--blue); }
+    .content strong { color: var(--text); }
+
+    /* ── Info boxes ───────────────────────────────────────────────────── */
+    .callout {
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 16px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .callout.blue  { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
+    .callout.green { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; }
+    .callout.amber { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+
+    /* ── Permissions table ────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 13px;
+    }
+    th {
+      background: var(--navy);
+      color: #fff;
+      font-weight: 600;
+      text-align: left;
+      padding: 10px 14px;
+    }
+    th:first-child { border-radius: 8px 0 0 0; }
+    th:last-child  { border-radius: 0 8px 0 0; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: var(--bg); }
+    td:first-child { font-family: monospace; font-size: 12px; color: var(--navy); white-space: nowrap; }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    footer {
+      background: var(--navy);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 28px;
+      font-size: 13px;
+    }
+    footer a { color: rgba(255,255,255,0.8); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo" aria-label="Home">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    </svg>
+  </a>
+  <a href="/" class="nav-brand">Will it <span>Fit?</span></a>
+  <span class="nav-sep">/</span>
+  <span class="nav-page">Privacy Policy</span>
+  <a href="/" class="nav-back">← Back to app</a>
+</nav>
+
+<div class="hero">
+  <h1>🔒 Privacy Policy</h1>
+  <p>We built this tool to be useful, not to collect your data. Here's exactly what we do and don't do.</p>
+  <div class="hero-meta">
+    <span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Last updated: April 2, 2026
+    </span>
+    <span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      ~3 min read
+    </span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar TOC ─────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-title">On this page</div>
+    <a href="#overview">Overview</a>
+    <a href="#collected">What we collect</a>
+    <a href="#not-collected">What we don't collect</a>
+    <a href="#third-party">Third parties</a>
+    <a href="#permissions">Permissions</a>
+    <a href="#retention">Data retention</a>
+    <a href="#children">Children</a>
+    <a href="#changes">Changes</a>
+    <a href="#contact">Contact</a>
+  </aside>
+
+  <!-- ── Main content ────────────────────────────────────────────────── -->
+  <div class="content">
+
+    <div class="callout green">
+      <strong>Short version:</strong> We don't sell your data, run ads, or track you. Car selections and product lists live on your device only. The only external service used is Anthropic's API for dimension extraction — and only as a fallback on sites that don't publish structured data.
+    </div>
+
+    <!-- Overview -->
+    <section id="overview">
+      <h2>🏠 Overview</h2>
+      <p>
+        <strong>Will it Fit?</strong> helps you check whether furniture or large items will fit in your car's boot before driving to a store. This policy covers both the <strong>web app</strong> at <a href="https://will-it-fit-livid.vercel.app">will-it-fit-livid.vercel.app</a> and the <strong>Chrome browser extension</strong>.
+      </p>
+      <p>
+        Developer: <strong>Anirudy Dev</strong><br/>
+        Contact: <a href="mailto:anirudy@gmail.com">anirudy@gmail.com</a><br/>
+        GitHub: <a href="https://github.com/anirudy-dev/will-it-fit" target="_blank">github.com/anirudy-dev/will-it-fit</a>
+      </p>
+    </section>
+
+    <!-- What we collect -->
+    <section id="collected">
+      <h2>📋 What we collect</h2>
+
+      <h3>1. Product page text (temporary, never stored by us)</h3>
+      <p>
+        When you visit a product page and the extension or web app cannot extract dimensions automatically from the page's structured data, a portion of the page's visible text (up to 10,000 characters) is sent to the <strong>Anthropic API</strong> for dimension extraction.
+      </p>
+      <ul>
+        <li>This text is used solely to identify numbers — packaging dimensions.</li>
+        <li>It is not stored by us on any server.</li>
+        <li>This only happens on sites without structured product data. IKEA, Home Depot, Wayfair, and Amazon are handled locally with zero API calls.</li>
+        <li>Anthropic's handling of this data is governed by their <a href="https://www.anthropic.com/privacy" target="_blank">Privacy Policy</a>.</li>
+      </ul>
+
+      <h3>2. Your Anthropic API key (extension only, stored locally)</h3>
+      <p>
+        If you provide an Anthropic API key in the extension settings, it is stored in <strong>Chrome's encrypted local storage</strong> (<code>chrome.storage.local</code>) on your device only. It is transmitted only to <code>api.anthropic.com</code> when making dimension requests — never to our servers or any other party.
+      </p>
+
+      <h3>3. Car selection (stored locally)</h3>
+      <p>
+        Your selected car make, model, and year are saved locally (in the browser's <code>localStorage</code> for the web app, or <code>chrome.storage.local</code> for the extension) so the tool remembers your car between sessions. This never leaves your device.
+      </p>
+
+      <h3>4. Product list (stored locally, session only)</h3>
+      <p>
+        Products you add to your fit-check list are held in local session storage. This data is not transmitted anywhere and is cleared when you close the tab or uninstall the extension.
+      </p>
+    </section>
+
+    <!-- What we don't collect -->
+    <section id="not-collected">
+      <h2>🚫 What we don't collect</h2>
+      <div class="callout amber">
+        None of the following are collected, stored, or shared — ever.
+      </div>
+      <ul>
+        <li>Your name, email address, or any personally identifiable information</li>
+        <li>Browsing history or a list of sites you visit</li>
+        <li>Cookies or tracking pixels of any kind</li>
+        <li>Analytics on how you use the tool (no Mixpanel, GA4, Amplitude, etc.)</li>
+        <li>Device fingerprints, IP addresses, or location data</li>
+        <li>Any data shared with advertisers (we have no advertisers)</li>
+      </ul>
+    </section>
+
+    <!-- Third parties -->
+    <section id="third-party">
+      <h2>🔗 Third-party services</h2>
+
+      <h3>Anthropic API</h3>
+      <p>
+        When package dimensions cannot be extracted from a page's structure directly, visible product page text is sent to Anthropic's API for processing. This is the only external service we use.
+      </p>
+      <ul>
+        <li><strong>Data sent:</strong> a text excerpt (≤10,000 characters) from the current product page</li>
+        <li><strong>Purpose:</strong> extracting numerical package dimensions</li>
+        <li><strong>Anthropic's privacy policy:</strong> <a href="https://www.anthropic.com/privacy" target="_blank">anthropic.com/privacy</a></li>
+      </ul>
+
+      <h3>Affiliate links (when enabled)</h3>
+      <p>
+        A future version of the extension may include affiliate links to retailers. When enabled, clicking a product link may route through an affiliate tracking URL. This will be clearly disclosed in the interface. The respective retailer's privacy policy governs any data collected after you click through.
+      </p>
+
+      <h3>Vercel (web app hosting)</h3>
+      <p>
+        The web app is hosted on Vercel. Vercel may log standard server access data (IP, timestamp, referrer) as part of their infrastructure. See <a href="https://vercel.com/legal/privacy-policy" target="_blank">Vercel's Privacy Policy</a>.
+      </p>
+    </section>
+
+    <!-- Permissions -->
+    <section id="permissions">
+      <h2>🔑 Extension permissions explained</h2>
+      <p>The Chrome extension requests only the permissions necessary to function:</p>
+      <table>
+        <thead>
+          <tr><th>Permission</th><th>Why it's needed</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>activeTab</td>
+            <td>Reads the text of the product page you're currently viewing to extract packaging dimensions</td>
+          </tr>
+          <tr>
+            <td>tabs</td>
+            <td>Detects when you navigate to a new page so the panel can auto-refresh with the new product's dimensions</td>
+          </tr>
+          <tr>
+            <td>storage</td>
+            <td>Saves your car selection and API key locally on your device between sessions</td>
+          </tr>
+          <tr>
+            <td>sidePanel</td>
+            <td>Displays the tool in Chrome's native side panel UI</td>
+          </tr>
+          <tr>
+            <td>scripting</td>
+            <td>Injects a lightweight script that reads packaging dimension text from product pages</td>
+          </tr>
+          <tr>
+            <td>&lt;all_urls&gt;</td>
+            <td>The extension must work on any retailer's website; the list of furniture retailers cannot be enumerated in advance</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Retention -->
+    <section id="retention">
+      <h2>🗑️ Data retention and deletion</h2>
+      <p>All data stored by this tool is on your device. You can delete it at any time:</p>
+
+      <h3>Web app</h3>
+      <ul>
+        <li>Open your browser's developer tools → Application → Local Storage → clear entries for this site</li>
+        <li>Or simply clear your browser's site data</li>
+      </ul>
+
+      <h3>Chrome extension</h3>
+      <ul>
+        <li>Open the extension panel → click the settings icon → Options → "Clear Saved Key &amp; Car"</li>
+        <li>Or uninstall the extension — all associated storage is removed automatically</li>
+      </ul>
+    </section>
+
+    <!-- Children -->
+    <section id="children">
+      <h2>👶 Children's privacy</h2>
+      <p>
+        This tool is not directed at children under 13. We do not knowingly collect any personal information from children. If you believe a child has provided personal information through this service, please contact us and we will delete it promptly.
+      </p>
+    </section>
+
+    <!-- Changes -->
+    <section id="changes">
+      <h2>📝 Changes to this policy</h2>
+      <p>
+        If we make material changes to this privacy policy, we will update the "Last updated" date at the top of the page. Continued use of the tool after changes are posted constitutes acceptance. We will not retroactively apply changes to data already collected under a prior policy.
+      </p>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact">
+      <h2>✉️ Contact</h2>
+      <p>Questions, concerns, or data deletion requests:</p>
+      <ul>
+        <li><strong>Email:</strong> <a href="mailto:anirudy@gmail.com">anirudy@gmail.com</a></li>
+        <li><strong>GitHub:</strong> <a href="https://github.com/anirudy-dev/will-it-fit" target="_blank">github.com/anirudy-dev/will-it-fit</a></li>
+      </ul>
+      <div class="callout blue">
+        <strong>Disclaimer:</strong> Boot space measurements in the database are approximate values sourced from published manufacturer specifications. Always measure your vehicle and items before making purchase decisions. This tool is provided free of charge and without warranty.
+      </div>
+    </section>
+
+  </div><!-- /.content -->
+</div><!-- /.layout -->
+
+<footer>
+  <p>
+    Will it Fit? · Boot Space Checker ·
+    <a href="/">Web App</a> ·
+    <a href="https://github.com/anirudy-dev/will-it-fit" target="_blank">GitHub</a>
+  </p>
+  <p style="margin-top:8px;font-size:12px;opacity:.6;">© 2026 Anirudy Dev. No cookies. No trackers. No nonsense.</p>
+</footer>
+
+</body>
+</html>
