@@ -9,7 +9,7 @@
 //
 // Replace CHROME_STORE_URL with your actual store listing URL once published.
 
-const CHROME_STORE_URL = "https://chromewebstore.google.com/detail/will-it-fit/YOUR_EXTENSION_ID";
+const CHROME_STORE_URL = "https://chromewebstore.google.com/detail/will-it-fit-%E2%80%94-trunk-space/eljikhglldllacolnonnpapfhhphlhki";
 
 // Detect if the user already has the extension installed.
 // The extension injects a tiny marker into the page via the content script.
@@ -55,7 +55,7 @@ export default function ExtensionBanner() {
           <line x1="10.88" y1="21.94" x2="15.46" y2="14" />
         </svg>
         <span style={{ fontWeight: 700, opacity: 0.95 }}>
-          Now available as a Chrome extension
+          Coming soon as a Chrome extension
         </span>
       </div>
 
