@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 
-const CHROME_STORE_URL = "https://chromewebstore.google.com/detail/will-it-fit/YOUR_EXTENSION_ID";
+const CHROME_STORE_URL = "https://chromewebstore.google.com/detail/will-it-fit-%E2%80%94-trunk-space/eljikhglldllacolnonnpapfhhphlhki";
 
 // Detect if the user already has the extension installed.
 // The extension injects a tiny marker via the content script.
