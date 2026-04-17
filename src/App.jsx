@@ -1,4 +1,3 @@
-import ExtensionBanner from "./ExtensionBanner";
 import * as THREE from "three";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -923,7 +922,7 @@ If there are truly no dimensions visible, return:
           </svg>
         </div>
         <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
-        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Trunk Space Checker</span>}
+        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Trunk Space Checker · 🇨🇦 🇺🇸 Only</span>}
 
         {/* ── Auth button (right-aligned) ── */}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
@@ -970,7 +969,6 @@ If there are truly no dimensions visible, return:
           )}
         </div>
       </nav>
-      <ExtensionBanner />
 
       {/* ── Page wrapper ── */}
       <div style={{maxWidth:1280,margin:"0 auto",padding:isMobile?"16px":"40px 24px 24px",display:"flex",flexDirection:"column",gap:isMobile?16:24}}>
@@ -981,7 +979,7 @@ If there are truly no dimensions visible, return:
 
           <p style={{fontSize:12,color:"#92400E",margin:"0 0 16px",lineHeight:1.6,background:"#FFFBEB",border:"1px solid #FDE68A",borderLeft:"3px solid #F59E0B",borderRadius:"0 6px 6px 0",padding:"8px 12px",display:"flex",gap:8,alignItems:"flex-start"}}>
             <span style={{flexShrink:0,fontSize:14}}>⚠️</span>
-            <span>This tool provides the best approximation, there could be cases where the product might not fit.</span>
+            <span>This tool provides the best approximation, there could be cases where the product might not fit. <strong>Currently available for Canada and the US only</strong> — international car models coming soon.</span>
           </p>
 
           <p style={{fontSize:isMobile?13:15,color:"#6B7280",margin:0,lineHeight:1.6}}>
