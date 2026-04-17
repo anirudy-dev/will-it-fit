@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
+import ExtensionBanner from "./ExtensionBanner";
 
 /* ─── Supabase client (disabled gracefully if env vars not set) ────────────── */
 const _url = import.meta.env?.VITE_SUPABASE_URL;
@@ -969,7 +970,7 @@ If there are truly no dimensions visible, return:
           )}
         </div>
       </nav>
-
+      <ExtensionBanner />
       {/* ── Page wrapper ── */}
       <div style={{maxWidth:1280,margin:"0 auto",padding:isMobile?"16px":"40px 24px 24px",display:"flex",flexDirection:"column",gap:isMobile?16:24}}>
 
