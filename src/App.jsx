@@ -922,8 +922,7 @@ If there are truly no dimensions visible, return:
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
           </svg>
         </div>
-        <span style={{fontWeight:700,fontSize:16,color:"#111827"}}>Will it <span style={{color:"#3B82F6"}}>Fit?</span></span>
-        {!isMobile&&<span style={{background:"#FEF9C3",color:"#854D0E",fontWeight:600,fontSize:12,padding:"3px 10px",borderRadius:99,border:"1px solid #FDE68A"}}>Trunk Space Checker · 🇨🇦 🇺🇸 Only</span>}
+        <img src="/TrunkFit_Logo.png" alt="TrunkFit" style={{height:36,width:"auto",objectFit:"contain"}}/>
 
         {/* ── Auth button (right-aligned) ── */}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
